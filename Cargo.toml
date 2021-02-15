@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+    "wechaty",
+    "wechaty-puppet",
+    "wechaty-puppet-service",
+]
