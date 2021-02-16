@@ -1,7 +1,5 @@
-use num::FromPrimitive;
 use regex::Regex;
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use wechaty_grpc::puppet::ContactPayloadResponse;
 
 #[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]
 #[repr(i32)]
@@ -40,31 +38,6 @@ pub struct ContactPayload {
     pub description: String,
     pub coworker: bool,
     pub phone: Vec<String>,
-}
-
-impl From<ContactPayloadResponse> for ContactPayload {
-    fn from(response: ContactPayloadResponse) -> Self {
-        Self {
-            id: response.id,
-            gender: FromPrimitive::from_i32(response.gender).unwrap(),
-            contact_type: FromPrimitive::from_i32(response.r#type).unwrap(),
-            name: response.name,
-            avatar: response.avatar,
-            address: response.address,
-            alias: response.alias,
-            city: response.city,
-            friend: response.friend,
-            province: response.province,
-            signature: response.signature,
-            star: response.star,
-            weixin: response.weixin,
-            corporation: response.corporation,
-            title: response.title,
-            description: response.description,
-            coworker: response.coworker,
-            phone: response.phone,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

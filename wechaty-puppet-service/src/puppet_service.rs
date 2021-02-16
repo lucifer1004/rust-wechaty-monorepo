@@ -27,6 +27,7 @@ use wechaty_puppet::schemas::room::{RoomMemberPayload, RoomPayload};
 use wechaty_puppet::schemas::room_invitation::RoomInvitationPayload;
 use wechaty_puppet::schemas::url_link::UrlLinkPayload;
 
+use crate::from_payload_response::FromPayloadResponse;
 use crate::service_endpoint::discover;
 
 pub struct PuppetService {
@@ -106,7 +107,7 @@ impl PuppetServiceInner {
 impl Actor for PuppetServiceInner {
     type Context = Context<Self>;
 
-    fn started(&mut self, ctx: &mut Self::Context) {
+    fn started(&mut self, _ctx: &mut Self::Context) {
         info!("Puppet service started");
     }
 
@@ -154,7 +155,7 @@ struct EventPayload {
 }
 
 impl StreamHandler<Result<EventResponse, Status>> for PuppetServiceInner {
-    fn handle(&mut self, item: Result<EventResponse, Status>, ctx: &mut Self::Context) {
+    fn handle(&mut self, item: Result<EventResponse, Status>, _ctx: &mut Self::Context) {
         match item {
             Ok(response) => {
                 let payload: EventPayload = from_str(&response.payload).unwrap();
@@ -622,7 +623,7 @@ impl PuppetImpl for PuppetService {
             .contact_payload(ContactPayloadRequest { id: contact_id.clone() })
             .await
         {
-            Ok(response) => Ok(ContactPayload::from(response.into_inner())),
+            Ok(response) => Ok(ContactPayload::from_payload_response(response.into_inner())),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to get raw payload for contact {}",
                 contact_id
@@ -842,7 +843,7 @@ impl PuppetImpl for PuppetService {
             .message_payload(MessagePayloadRequest { id: message_id.clone() })
             .await
         {
-            Ok(response) => Ok(MessagePayload::from(response.into_inner())),
+            Ok(response) => Ok(MessagePayload::from_payload_response(response.into_inner())),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to get raw payload for message {}",
                 message_id
@@ -916,7 +917,7 @@ impl PuppetImpl for PuppetService {
             })
             .await
         {
-            Ok(response) => Ok(FriendshipPayload::from(response.into_inner())),
+            Ok(response) => Ok(FriendshipPayload::from_payload_response(response.into_inner())),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to get raw payload for friendship {}",
                 friendship_id
@@ -933,7 +934,7 @@ impl PuppetImpl for PuppetService {
             })
             .await
         {
-            Ok(response) => Ok(()),
+            Ok(_) => Ok(()),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to accept room invitation {}",
                 room_invitation_id
@@ -957,7 +958,7 @@ impl PuppetImpl for PuppetService {
             })
             .await
         {
-            Ok(response) => Ok(RoomInvitationPayload::from(response.into_inner())),
+            Ok(response) => Ok(RoomInvitationPayload::from_payload_response(response.into_inner())),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to get raw payload for room invitation {}",
                 room_invitation_id
@@ -1105,7 +1106,7 @@ impl PuppetImpl for PuppetService {
             .room_payload(RoomPayloadRequest { id: room_id.clone() })
             .await
         {
-            Ok(response) => Ok(RoomPayload::from(response.into_inner())),
+            Ok(response) => Ok(RoomPayload::from_payload_response(response.into_inner())),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to get raw payload for room {}",
                 room_id
@@ -1181,7 +1182,7 @@ impl PuppetImpl for PuppetService {
             })
             .await
         {
-            Ok(response) => Ok(RoomMemberPayload::from(response.into_inner())),
+            Ok(response) => Ok(RoomMemberPayload::from_payload_response(response.into_inner())),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to get raw payload for member {} of room {}",
                 contact_id, room_id

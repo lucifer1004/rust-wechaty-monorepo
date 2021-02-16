@@ -1,5 +1,4 @@
 use regex::Regex;
-use wechaty_grpc::puppet::{RoomMemberPayloadResponse, RoomPayloadResponse};
 
 #[derive(Debug, Clone)]
 pub struct RoomMemberQueryFilter {
@@ -25,19 +24,6 @@ pub struct RoomPayload {
     pub admin_id_list: Vec<String>,
 }
 
-impl From<RoomPayloadResponse> for RoomPayload {
-    fn from(response: RoomPayloadResponse) -> Self {
-        Self {
-            id: response.id,
-            topic: response.topic,
-            avatar: response.avatar,
-            member_id_list: response.member_ids,
-            owner_id: response.owner_id,
-            admin_id_list: response.admin_ids,
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct RoomMemberPayload {
     pub id: String,
@@ -45,18 +31,6 @@ pub struct RoomMemberPayload {
     pub inviter_id: String,
     pub avatar: String,
     pub name: String,
-}
-
-impl From<RoomMemberPayloadResponse> for RoomMemberPayload {
-    fn from(response: RoomMemberPayloadResponse) -> Self {
-        Self {
-            id: response.id,
-            room_alias: response.room_alias,
-            avatar: response.avatar,
-            inviter_id: response.inviter_id,
-            name: response.name,
-        }
-    }
 }
 
 // FIXME: trait aliases are experimental, see issue #41517 <https://github.com/rust-lang/rust/issues/41517>

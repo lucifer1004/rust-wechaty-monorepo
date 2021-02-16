@@ -1,7 +1,5 @@
-use num::FromPrimitive;
 use regex::Regex;
 use serde_repr::{Deserialize_repr, Serialize_repr};
-use wechaty_grpc::puppet::MessagePayloadResponse;
 
 #[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]
 #[repr(i32)]
@@ -87,22 +85,6 @@ pub struct MessagePayload {
     pub mention_id_list: Vec<String>,
     pub room_id: String,
     pub to_id: String,
-}
-
-impl From<MessagePayloadResponse> for MessagePayload {
-    fn from(response: MessagePayloadResponse) -> Self {
-        Self {
-            id: response.id,
-            from_id: response.from_id,
-            to_id: response.to_id,
-            room_id: response.room_id,
-            filename: response.filename,
-            text: response.text,
-            timestamp: response.timestamp,
-            message_type: FromPrimitive::from_i32(response.r#type).unwrap(),
-            mention_id_list: response.mention_ids,
-        }
-    }
 }
 
 #[derive(Debug, Clone)]

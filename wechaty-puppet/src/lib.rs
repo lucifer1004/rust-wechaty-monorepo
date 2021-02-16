@@ -7,6 +7,10 @@ pub mod puppet;
 pub mod schemas;
 pub mod types;
 
+pub use puppet::{Puppet, PuppetImpl};
+pub use schemas::puppet::PuppetOptions;
+pub use types::{AsyncFnPtr, IntoAsyncFnPtr};
+
 #[cfg(test)]
 mod tests {
     #[test]

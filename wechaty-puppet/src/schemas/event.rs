@@ -1,4 +1,3 @@
-use num::FromPrimitive;
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
 use crate::schemas::payload::PayloadType;
