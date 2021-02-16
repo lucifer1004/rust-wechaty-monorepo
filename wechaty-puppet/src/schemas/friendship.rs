@@ -1,7 +1,7 @@
-use std::time::{UNIX_EPOCH, SystemTime};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use num::FromPrimitive;
-use serde_repr::{Serialize_repr, Deserialize_repr};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use wechaty_grpc::puppet::FriendshipPayloadResponse;
 
 #[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]
@@ -63,36 +63,30 @@ pub enum FriendshipPayload {
 impl From<FriendshipPayloadResponse> for FriendshipPayload {
     fn from(response: FriendshipPayloadResponse) -> Self {
         match response.r#type {
-            1 => {
-                FriendshipPayload::Confirm {
-                    id: response.id,
-                    contact_id: response.contact_id,
-                    hello: response.hello,
-                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                    friendship_type: FriendshipType::Confirm,
-                }
-            }
-            2 => {
-                FriendshipPayload::Receive {
-                    id: response.id,
-                    contact_id: response.contact_id,
-                    hello: response.hello,
-                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                    scene: FromPrimitive::from_i32(response.scene).unwrap(),
-                    stranger: response.stranger,
-                    ticket: response.ticket,
-                    friendship_type: FriendshipType::Receive,
-                }
-            }
-            3 => {
-                FriendshipPayload::Verify {
-                    id: response.id,
-                    contact_id: response.contact_id,
-                    hello: response.hello,
-                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                    friendship_type: FriendshipType::Verify,
-                }
-            }
+            1 => FriendshipPayload::Confirm {
+                id: response.id,
+                contact_id: response.contact_id,
+                hello: response.hello,
+                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                friendship_type: FriendshipType::Confirm,
+            },
+            2 => FriendshipPayload::Receive {
+                id: response.id,
+                contact_id: response.contact_id,
+                hello: response.hello,
+                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                scene: FromPrimitive::from_i32(response.scene).unwrap(),
+                stranger: response.stranger,
+                ticket: response.ticket,
+                friendship_type: FriendshipType::Receive,
+            },
+            3 => FriendshipPayload::Verify {
+                id: response.id,
+                contact_id: response.contact_id,
+                hello: response.hello,
+                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                friendship_type: FriendshipType::Verify,
+            },
             _ => FriendshipPayload::Unknown,
         }
     }

@@ -47,8 +47,8 @@ impl From<String> for FileBox {
 }
 
 pub struct Puppet<T>
-    where
-        T: PuppetImpl,
+where
+    T: PuppetImpl,
 {
     puppet_impl: T,
     addr: Addr<PuppetInner>,
@@ -70,7 +70,7 @@ struct PuppetInner {
 impl PuppetInner {
     fn new() -> Self {
         Self {
-            subscribers: Vec::new()
+            subscribers: Vec::new(),
         }
     }
 }
@@ -103,8 +103,8 @@ impl Handler<PuppetEvent> for PuppetInner {
 }
 
 impl<T> Puppet<T>
-    where
-        T: PuppetImpl,
+where
+    T: PuppetImpl,
 {
     pub fn new(puppet_impl: T) -> Self {
         let inner = PuppetInner::new();
@@ -734,7 +734,7 @@ pub trait PuppetImpl {
     async fn room_add(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
     async fn room_avatar(&mut self, room_id: String) -> Result<FileBox, PuppetError>;
     async fn room_create(&mut self, contact_id_list: Vec<String>, topic: Option<String>)
-                         -> Result<String, PuppetError>;
+        -> Result<String, PuppetError>;
     async fn room_del(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
     async fn room_qr_code(&mut self, room_id: String) -> Result<String, PuppetError>;
     async fn room_quit(&mut self, room_id: String) -> Result<(), PuppetError>;

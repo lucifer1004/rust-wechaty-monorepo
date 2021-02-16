@@ -1,6 +1,6 @@
 use num::FromPrimitive;
 use regex::Regex;
-use serde_repr::{Serialize_repr, Deserialize_repr};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use wechaty_grpc::puppet::ContactPayloadResponse;
 
 #[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]

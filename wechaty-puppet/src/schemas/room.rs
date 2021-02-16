@@ -1,5 +1,5 @@
 use regex::Regex;
-use wechaty_grpc::puppet::{RoomPayloadResponse, RoomMemberPayloadResponse};
+use wechaty_grpc::puppet::{RoomMemberPayloadResponse, RoomPayloadResponse};
 
 #[derive(Debug, Clone)]
 pub struct RoomMemberQueryFilter {
