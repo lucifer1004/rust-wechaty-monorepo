@@ -735,8 +735,8 @@ pub trait PuppetImpl {
     async fn room_avatar(&mut self, room_id: String) -> Result<FileBox, PuppetError>;
     async fn room_create(&mut self, contact_id_list: Vec<String>, topic: Option<String>)
                          -> Result<String, PuppetError>;
-    async fn room_del(&mut self, room_id: String) -> Result<(), PuppetError>;
-    async fn room_qrcode(&mut self, room_id: String) -> Result<String, PuppetError>;
+    async fn room_del(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
+    async fn room_qr_code(&mut self, room_id: String) -> Result<String, PuppetError>;
     async fn room_quit(&mut self, room_id: String) -> Result<(), PuppetError>;
     async fn room_topic(&mut self, room_id: String) -> Result<String, PuppetError>;
     async fn room_topic_set(&mut self, room_id: String, topic: String) -> Result<(), PuppetError>;

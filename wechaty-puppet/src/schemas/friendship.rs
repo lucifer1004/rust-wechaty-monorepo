@@ -1,5 +1,8 @@
+use std::time::{UNIX_EPOCH, SystemTime};
+
 use num::FromPrimitive;
 use serde_repr::{Serialize_repr, Deserialize_repr};
+use wechaty_grpc::puppet::FriendshipPayloadResponse;
 
 #[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]
 #[repr(i32)]
@@ -30,30 +33,69 @@ pub enum FriendshipSceneType {
 // TODO: In Rust, a struct is not allowed to have a fixed value as its field.
 #[derive(Debug, Clone)]
 pub enum FriendshipPayload {
+    Unknown,
     Confirm {
         id: String,
         contact_id: String,
-        hello: Option<String>,
+        hello: String,
         timestamp: u64,
         friendship_type: FriendshipType,
     },
     Receive {
         id: String,
         contact_id: String,
-        hello: Option<String>,
+        hello: String,
         timestamp: u64,
-        scene: Option<FriendshipSceneType>,
-        stranger: Option<String>,
+        scene: FriendshipSceneType,
+        stranger: String,
         ticket: String,
         friendship_type: FriendshipType,
     },
     Verify {
         id: String,
         contact_id: String,
-        hello: Option<String>,
+        hello: String,
         timestamp: u64,
         friendship_type: FriendshipType,
     },
+}
+
+impl From<FriendshipPayloadResponse> for FriendshipPayload {
+    fn from(response: FriendshipPayloadResponse) -> Self {
+        match response.r#type {
+            1 => {
+                FriendshipPayload::Confirm {
+                    id: response.id,
+                    contact_id: response.contact_id,
+                    hello: response.hello,
+                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                    friendship_type: FriendshipType::Confirm,
+                }
+            }
+            2 => {
+                FriendshipPayload::Receive {
+                    id: response.id,
+                    contact_id: response.contact_id,
+                    hello: response.hello,
+                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                    scene: FromPrimitive::from_i32(response.scene).unwrap(),
+                    stranger: response.stranger,
+                    ticket: response.ticket,
+                    friendship_type: FriendshipType::Receive,
+                }
+            }
+            3 => {
+                FriendshipPayload::Verify {
+                    id: response.id,
+                    contact_id: response.contact_id,
+                    hello: response.hello,
+                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+                    friendship_type: FriendshipType::Verify,
+                }
+            }
+            _ => FriendshipPayload::Unknown,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
