@@ -9,15 +9,15 @@ pub struct RoomMemberQueryFilter {
 
 #[derive(Debug, Clone)]
 pub struct RoomQueryFilter {
-    id: Option<String>,
-    topic: Option<String>,
-    topic_regex: Option<Regex>,
+    pub id: Option<String>,
+    pub topic: Option<String>,
+    pub topic_regex: Option<Regex>,
 }
 
 #[derive(Debug, Clone)]
 pub struct RoomPayload {
-    id: String,
-    topic: String,
+    pub id: String,
+    pub topic: String,
     avatar: Option<String>,
     member_id_list: Vec<String>,
     owner_id: String,
@@ -33,6 +33,7 @@ pub struct RoomMemberPayload {
     name: String,
 }
 
-pub type RoomPayloadFilterFunction = fn(RoomPayload) -> bool;
-
-pub type RoomPayloadFilterFactory = fn(RoomQueryFilter) -> RoomPayloadFilterFunction;
+// FIXME: trait aliases are experimental, see issue #41517 <https://github.com/rust-lang/rust/issues/41517>
+// pub trait RoomPayloadFilterFunction = Fn(RoomPayload) -> bool;
+//
+// pub trait RoomPayloadFilterFactory = Fn(RoomQueryFilter) -> RoomPayloadFilterFunction;

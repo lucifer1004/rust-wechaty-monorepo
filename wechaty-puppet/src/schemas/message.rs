@@ -1,6 +1,6 @@
 use regex::Regex;
 
-#[derive(Debug, Copy, Clone, FromPrimitive)]
+#[derive(Debug, Copy, Clone, PartialEq, FromPrimitive)]
 pub enum MessageType {
     Unknown,
     Attachment,
@@ -71,41 +71,30 @@ pub enum WechatMessageType {
 }
 
 #[derive(Debug, Clone)]
-pub enum MessagePayload {
-    Room {
-        id: String,
-        filename: Option<String>,
-        text: Option<String>,
-        timestamp: u64,
-        message_type: MessageType,
-        from_id: Option<String>,
-        mention_ids: Vec<String>,
-        room_id: String,
-        to_id: Option<String>,
-    },
-    To {
-        id: String,
-        filename: Option<String>,
-        text: Option<String>,
-        timestamp: u64,
-        message_type: MessageType,
-        from_id: String,
-        room_id: Option<String>,
-        to_id: String,
-    },
+pub struct MessagePayload {
+    pub id: String,
+    pub filename: String,
+    pub text: String,
+    pub timestamp: u64,
+    pub message_type: MessageType,
+    pub from_id: String,
+    pub mention_id_list: Vec<String>,
+    pub room_id: String,
+    pub to_id: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct MessageQueryFilter {
-    from_id: Option<String>,
-    id: Option<String>,
-    room_id: Option<String>,
-    text: Option<String>,
-    text_regex: Option<Regex>,
-    to_id: Option<String>,
-    message_type: Option<MessageType>,
+    pub from_id: Option<String>,
+    pub id: Option<String>,
+    pub room_id: Option<String>,
+    pub text: Option<String>,
+    pub text_regex: Option<Regex>,
+    pub to_id: Option<String>,
+    pub message_type: Option<MessageType>,
 }
 
-pub type MessagePayloadFilterFunction = fn(MessagePayload) -> bool;
-
-pub type MessagePayloadFilterFactory = fn(MessageQueryFilter) -> MessagePayloadFilterFunction;
+// FIXME: trait aliases are experimental, see issue #41517 <https://github.com/rust-lang/rust/issues/41517>
+// pub trait MessagePayloadFilterFunction = Fn(MessagePayload) -> bool;
+//
+// pub trait MessagePayloadFilterFactory = Fn(MessageQueryFilter) -> MessagePayloadFilterFunction;

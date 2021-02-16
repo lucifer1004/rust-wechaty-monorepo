@@ -19,7 +19,7 @@ pub type PuppetRoomLeaveListener = AsyncFnPtr<EventRoomLeavePayload, ()>;
 pub type PuppetRoomTopicListener = AsyncFnPtr<EventRoomTopicPayload, ()>;
 pub type PuppetScanListener = AsyncFnPtr<EventScanPayload, ()>;
 
-#[derive(Message)]
+#[derive(Debug, Clone, Message)]
 #[rtype("()")]
 pub enum PuppetEvent {
     Dirty(EventDirtyPayload),

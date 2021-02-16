@@ -17,36 +17,37 @@ pub enum ContactType {
 
 #[derive(Debug, Clone)]
 pub struct ContactPayload {
-    id: String,
-    gender: ContactGender,
-    contact_type: ContactType,
-    name: String,
-    avatar: String,
-    address: String,
-    alias: String,
-    city: String,
-    friend: bool,
-    province: String,
-    signature: String,
-    star: bool,
-    weixin: String,
-    corporation: String,
-    title: String,
-    description: String,
-    coworker: bool,
-    phone: Vec<String>,
+    pub id: String,
+    pub gender: ContactGender,
+    pub contact_type: ContactType,
+    pub name: String,
+    pub avatar: String,
+    pub address: String,
+    pub alias: String,
+    pub city: String,
+    pub friend: bool,
+    pub province: String,
+    pub signature: String,
+    pub star: bool,
+    pub weixin: String,
+    pub corporation: String,
+    pub title: String,
+    pub description: String,
+    pub coworker: bool,
+    pub phone: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct ContactQueryFilter {
-    alias: Option<String>,
-    alias_regex: Option<Regex>,
-    id: Option<String>,
-    name: Option<String>,
-    name_regex: Option<Regex>,
-    weixin: Option<String>,
+    pub alias: Option<String>,
+    pub alias_regex: Option<Regex>,
+    pub id: Option<String>,
+    pub name: Option<String>,
+    pub name_regex: Option<Regex>,
+    pub weixin: Option<String>,
 }
 
-pub type ContactPayloadFilterFunction = fn(ContactPayload) -> bool;
-
-pub type ContactPayloadFilterFactory = fn(ContactQueryFilter) -> ContactPayloadFilterFunction;
+// FIXME: trait aliases are experimental, see issue #41517 <https://github.com/rust-lang/rust/issues/41517>
+// pub trait ContactPayloadFilterFunction = Fn(ContactPayload) -> bool;
+//
+// pub trait ContactPayloadFilterFactory = Fn(ContactQueryFilter) -> ContactPayloadFilterFunction;

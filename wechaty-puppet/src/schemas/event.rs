@@ -33,7 +33,7 @@ pub struct EventMessagePayload {
 
 #[derive(Debug, Clone)]
 pub struct EventRoomInvitePayload {
-    room_invitation_id: String
+    room_invitation_id: String,
 }
 
 #[derive(Debug, Clone)]

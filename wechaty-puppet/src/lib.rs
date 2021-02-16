@@ -1,9 +1,10 @@
 #[macro_use]
 extern crate num_derive;
 
+pub mod error;
+pub mod events;
 pub mod puppet;
 pub mod schemas;
-pub mod events;
 pub mod types;
 
 #[cfg(test)]
