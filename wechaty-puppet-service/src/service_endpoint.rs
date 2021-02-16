@@ -1,6 +1,5 @@
 use serde::Deserialize;
-
-use crate::error::EndpointError;
+use wechaty_puppet::error::PuppetError;
 
 #[derive(Debug, Deserialize)]
 struct Endpoint {
@@ -8,21 +7,22 @@ struct Endpoint {
     port: usize,
 }
 
-const WECHATY_ENDPOINT_RESOLUTION_SERVICE_URI: &str = "https://api.chatie.io/v0/hosties/";
+const WECHATY_ENDPOINT_RESOLUTION_SERVICE_URI: &'static str = "https://api.chatie.io/v0/hosties/";
+const ENDPOINT_SERVICE_ERROR: &'static str = "Endpoint service error";
 
-pub async fn discover(token: &str) -> Result<Endpoint, EndpointError> {
+pub async fn discover(token: String) -> Result<String, PuppetError> {
     match reqwest::get(&format!("{}{}", WECHATY_ENDPOINT_RESOLUTION_SERVICE_URI, token)).await {
         Ok(res) => match res.json::<Endpoint>().await {
             Ok(endpoint) => {
                 if endpoint.port == 0 {
-                    Err(EndpointError::InvalidToken)
+                    Err(PuppetError::InvalidToken)
                 } else {
-                    Ok(endpoint)
+                    Ok(format!("grpc://{}:{}", endpoint.ip, endpoint.port))
                 }
             }
-            Err(err) => Err(EndpointError::from(err)),
+            Err(_) => Err(PuppetError::Network(ENDPOINT_SERVICE_ERROR.to_owned())),
         },
-        Err(err) => Err(EndpointError::from(err)),
+        Err(_) => Err(PuppetError::Network(ENDPOINT_SERVICE_ERROR.to_owned())),
     }
 }
 
@@ -31,7 +31,7 @@ mod tests {
     use super::*;
 
     #[actix_rt::test]
-    async fn it_works() {
-        println!("{:?}", discover("123").await);
+    async fn can_discover() {
+        println!("{:?}", discover("123".to_owned()).await);
     }
 }

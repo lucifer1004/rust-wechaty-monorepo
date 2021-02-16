@@ -1,4 +1,8 @@
-#[derive(Debug, Copy, Clone, FromPrimitive)]
+use num::FromPrimitive;
+use serde_repr::{Serialize_repr, Deserialize_repr};
+
+#[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]
+#[repr(i32)]
 pub enum FriendshipType {
     Unknown,
     Confirm,
@@ -6,7 +10,8 @@ pub enum FriendshipType {
     Verify,
 }
 
-#[derive(Debug, Copy, Clone, FromPrimitive)]
+#[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]
+#[repr(i32)]
 pub enum FriendshipSceneType {
     Unknown = 0,
     QQ = 1,

@@ -2,7 +2,8 @@ use std::{error, fmt};
 
 /// The errors that can occur during the communication with the puppet.
 pub enum PuppetError {
-    Network,
+    InvalidToken,
+    Network(String),
     Unsupported(String),
     UnknownPayloadType,
     UnknownMessageType,
@@ -17,7 +18,8 @@ impl fmt::Debug for PuppetError {
 impl fmt::Display for PuppetError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PuppetError::Network => write!(fmt, "Network failure"),
+            PuppetError::InvalidToken => write!(fmt, "Invalid token"),
+            PuppetError::Network(reason) => write!(fmt, "Network failure, reason: {}", reason),
             PuppetError::Unsupported(function) => write!(fmt, "Unsupported function: {}", function),
             PuppetError::UnknownPayloadType => write!(fmt, "Unknown payload type"),
             PuppetError::UnknownMessageType => write!(fmt, "Unknown message type"),
@@ -25,9 +27,12 @@ impl fmt::Display for PuppetError {
     }
 }
 
-// impl From<reqwest::Error> for PuppetError {
-//     fn from(err: reqwest::Error) -> PuppetError {
-//         PuppetError::Network(err)
+// impl<E> From<E> for PuppetError
+// where
+//     E: error::Error,
+// {
+//     fn from(err: E) -> PuppetError {
+//         PuppetError::Network(format!("{}", err))
 //     }
 // }
 

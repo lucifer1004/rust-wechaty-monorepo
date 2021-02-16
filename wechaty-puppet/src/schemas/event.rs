@@ -1,6 +1,10 @@
+use num::FromPrimitive;
+use serde_repr::{Serialize_repr, Deserialize_repr};
+
 use crate::schemas::payload::PayloadType;
 
-#[derive(Debug, Copy, Clone, FromPrimitive)]
+#[derive(Debug, Clone, PartialEq, FromPrimitive, Deserialize_repr, Serialize_repr)]
+#[repr(i32)]
 pub enum ScanStatus {
     Unknown,
     Cancel,
@@ -12,89 +16,89 @@ pub enum ScanStatus {
 
 #[derive(Debug, Clone)]
 pub struct EventFriendshipPayload {
-    friendship_id: String,
+    pub friendship_id: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventLoginPayload {
-    contact_id: String,
+    pub contact_id: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventLogoutPayload {
-    contact_id: String,
-    data: String,
+    pub contact_id: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventMessagePayload {
-    message_id: String,
+    pub message_id: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventRoomInvitePayload {
-    room_invitation_id: String,
+    pub room_invitation_id: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventRoomJoinPayload {
-    invitee_id_list: Vec<String>,
-    inviter_id: String,
-    room_id: String,
-    timestamp: u64,
+    pub invitee_id_list: Vec<String>,
+    pub inviter_id: String,
+    pub room_id: String,
+    pub timestamp: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventRoomLeavePayload {
-    removee_id_list: Vec<String>,
-    remover_id: String,
-    room_id: String,
-    timestamp: u64,
+    pub removee_id_list: Vec<String>,
+    pub remover_id: String,
+    pub room_id: String,
+    pub timestamp: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventRoomTopicPayload {
-    changer_id: String,
-    new_topic: String,
-    old_topic: String,
-    room_id: String,
-    timestamp: u64,
+    pub changer_id: String,
+    pub new_topic: String,
+    pub old_topic: String,
+    pub room_id: String,
+    pub timestamp: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventScanPayload {
-    status: ScanStatus,
-    qrcode: Option<String>,
-    data: Option<String>,
+    pub status: ScanStatus,
+    pub qrcode: Option<String>,
+    pub data: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventDongPayload {
-    data: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventErrorPayload {
-    data: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventReadyPayload {
-    data: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventResetPayload {
-    data: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventHeartbeatPayload {
-    data: String,
+    pub data: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct EventDirtyPayload {
-    payload_type: PayloadType,
-    payload_id: String,
+    pub payload_type: PayloadType,
+    pub payload_id: String,
 }

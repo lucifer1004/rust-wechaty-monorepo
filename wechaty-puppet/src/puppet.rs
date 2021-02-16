@@ -1,8 +1,9 @@
 use std::collections::HashSet;
+use std::fmt;
 
-use actix::{Actor, Context, Handler, Recipient};
+use actix::{Actor, Addr, Context, Handler, Recipient};
 use async_trait::async_trait;
-use log::{debug, error};
+use log::{debug, error, info};
 use lru::LruCache;
 
 use crate::error::PuppetError;
@@ -24,14 +25,34 @@ const DEFAULT_ROOM_CACHE_CAP: usize = 500;
 const DEFAULT_ROOM_MEMBER_CACHE_CAP: usize = 30000;
 const DEFAULT_ROOM_INVITATION_CACHE_CAP: usize = 100;
 
-// TODO: Implementation
+// TODO: FileBox Implementation
 pub struct FileBox {}
 
+impl FileBox {
+    pub fn to_string(&self) -> String {
+        String::new()
+    }
+}
+
+impl fmt::Display for FileBox {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(fmt, "{}", self.to_string())
+    }
+}
+
+impl From<String> for FileBox {
+    fn from(_: String) -> Self {
+        Self {}
+    }
+}
+
 pub struct Puppet<T>
-where
-    T: PuppetImpl,
+    where
+        T: PuppetImpl,
 {
     puppet_impl: T,
+    addr: Addr<PuppetInner>,
+    inner: PuppetInner,
     cache_contact_payload: LruCache<String, ContactPayload>,
     cache_friendship_payload: LruCache<String, FriendshipPayload>,
     cache_message_payload: LruCache<String, MessagePayload>,
@@ -39,16 +60,59 @@ where
     cache_room_member_payload: LruCache<String, RoomMemberPayload>,
     cache_room_invitation_payload: LruCache<String, RoomInvitationPayload>,
     id: Option<String>,
+}
+
+#[derive(Clone)]
+struct PuppetInner {
     subscribers: Vec<Recipient<PuppetEvent>>,
 }
 
+impl PuppetInner {
+    fn new() -> Self {
+        Self {
+            subscribers: Vec::new()
+        }
+    }
+}
+
+impl Actor for PuppetInner {
+    type Context = Context<Self>;
+
+    fn started(&mut self, _ctx: &mut Self::Context) {
+        info!("Puppet started");
+    }
+
+    fn stopped(&mut self, _ctx: &mut Self::Context) {
+        info!("Puppet stopped");
+    }
+}
+
+impl Handler<PuppetEvent> for PuppetInner {
+    type Result = ();
+
+    fn handle(&mut self, msg: PuppetEvent, _ctx: &mut Self::Context) -> Self::Result {
+        for subscriber in self.subscribers.clone() {
+            match subscriber.do_send(msg.clone()) {
+                Err(e) => {
+                    error!("Internal error: {}", e);
+                }
+                Ok(_) => {}
+            }
+        }
+    }
+}
+
 impl<T> Puppet<T>
-where
-    T: PuppetImpl,
+    where
+        T: PuppetImpl,
 {
     pub fn new(puppet_impl: T) -> Self {
+        let inner = PuppetInner::new();
+
         Self {
             puppet_impl,
+            addr: inner.clone().start(),
+            inner,
             cache_contact_payload: LruCache::new(DEFAULT_CONTACT_CACHE_CAP),
             cache_friendship_payload: LruCache::new(DEFAULT_FRIENDSHIP_CACHE_CAP),
             cache_message_payload: LruCache::new(DEFAULT_MESSAGE_CACHE_CAP),
@@ -56,8 +120,11 @@ where
             cache_room_member_payload: LruCache::new(DEFAULT_ROOM_MEMBER_CACHE_CAP),
             cache_room_invitation_payload: LruCache::new(DEFAULT_ROOM_INVITATION_CACHE_CAP),
             id: None,
-            subscribers: Vec::new(),
         }
+    }
+
+    pub fn self_addr(&self) -> Recipient<PuppetEvent> {
+        self.addr.clone().recipient()
     }
 
     pub fn self_id(self) -> Option<String> {
@@ -135,7 +202,11 @@ where
                 filtered_contact_id_list.push(contact_id);
             }
         }
-        Ok(filtered_contact_id_list.into_iter().collect::<HashSet<String>>().into_iter().collect::<Vec<String>>())
+        Ok(filtered_contact_id_list
+            .into_iter()
+            .collect::<HashSet<String>>()
+            .into_iter()
+            .collect::<Vec<String>>())
     }
 
     pub async fn contact_search(
@@ -301,7 +372,10 @@ where
         conversation_id: String,
         message_id: String,
     ) -> Result<Option<String>, PuppetError> {
-        debug!("message_forward(conversation_id = {}, message_id = {})", conversation_id, message_id);
+        debug!(
+            "message_forward(conversation_id = {}, message_id = {})",
+            conversation_id, message_id
+        );
         let payload = self.message_payload(message_id.clone()).await;
         match payload {
             Ok(payload) => match payload.message_type {
@@ -392,12 +466,23 @@ where
     */
 
     /// Room invitation payload getter.
-    pub async fn room_invitation_payload(&mut self, room_invitation_id: String) -> Result<RoomInvitationPayload, PuppetError> {
+    pub async fn room_invitation_payload(
+        &mut self,
+        room_invitation_id: String,
+    ) -> Result<RoomInvitationPayload, PuppetError> {
         debug!("room_invitation_payload(room_invitation_id = {})", room_invitation_id);
         if self.cache_room_invitation_payload.contains(&room_invitation_id) {
-            Ok(self.cache_room_invitation_payload.get(&room_invitation_id).unwrap().clone())
+            Ok(self
+                .cache_room_invitation_payload
+                .get(&room_invitation_id)
+                .unwrap()
+                .clone())
         } else {
-            match self.puppet_impl.room_invitation_raw_payload(room_invitation_id.clone()).await {
+            match self
+                .puppet_impl
+                .room_invitation_raw_payload(room_invitation_id.clone())
+                .await
+            {
                 Ok(payload) => {
                     self.cache_room_invitation_payload
                         .put(room_invitation_id.clone(), payload.clone());
@@ -423,8 +508,8 @@ where
     }
 
     /*
-        Room
-     */
+       Room
+    */
 
     pub async fn room_payload(&mut self, room_id: String) -> Result<RoomPayload, PuppetError> {
         debug!("room_payload(room_id = {})", room_id);
@@ -445,16 +530,23 @@ where
         format!("{}@@@{}", contact_id, room_id)
     }
 
-    pub async fn room_member_payload(&mut self, room_id: String, member_id: String) -> Result<RoomMemberPayload, PuppetError> {
+    pub async fn room_member_payload(
+        &mut self,
+        room_id: String,
+        member_id: String,
+    ) -> Result<RoomMemberPayload, PuppetError> {
         debug!("room_member_payload(room_id = {}, member_id = {})", room_id, member_id);
         let cache_key = Puppet::<T>::cache_key_room_member(room_id.clone(), member_id.clone());
         if self.cache_room_member_payload.contains(&cache_key) {
             Ok(self.cache_room_member_payload.get(&cache_key).unwrap().clone())
         } else {
-            match self.puppet_impl.room_member_raw_payload(room_id.clone(), member_id.clone()).await {
+            match self
+                .puppet_impl
+                .room_member_raw_payload(room_id.clone(), member_id.clone())
+                .await
+            {
                 Ok(payload) => {
-                    self.cache_room_member_payload
-                        .put(cache_key, payload.clone());
+                    self.cache_room_member_payload.put(cache_key, payload.clone());
                     Ok(payload)
                 }
                 Err(e) => Err(e),
@@ -535,12 +627,12 @@ where
         match self.puppet_impl.room_member_list(room_id.clone()).await {
             Ok(contact_id_list) => {
                 for contact_id in contact_id_list {
-                    let cache_key =  Puppet::<T>::cache_key_room_member(room_id.clone(), contact_id);
+                    let cache_key = Puppet::<T>::cache_key_room_member(room_id.clone(), contact_id);
                     self.cache_room_member_payload.pop(&cache_key);
                 }
                 Ok(())
-            },
-            Err(e) => Err(e)
+            }
+            Err(e) => Err(e),
         }
     }
 
@@ -564,25 +656,10 @@ where
     }
 }
 
-impl<T: 'static + Unpin + PuppetImpl> Actor for Puppet<T> {
-    type Context = Context<Self>;
-}
-
-impl<T: 'static + Unpin + PuppetImpl> Handler<PuppetEvent> for Puppet<T> {
-    type Result = ();
-
-    // TODO: Implementation
-    fn handle(&mut self, msg: PuppetEvent, ctx: &mut Self::Context) -> Self::Result {
-        for subscriber in self.subscribers.clone() {
-            subscriber.do_send(msg.clone());
-        }
-    }
-}
-
 #[async_trait]
 pub trait PuppetImpl {
     async fn contact_self_name_set(&mut self, name: String) -> Result<(), PuppetError>;
-    async fn contact_self_qrcode(&mut self) -> Result<String, PuppetError>;
+    async fn contact_self_qr_code(&mut self) -> Result<String, PuppetError>;
     async fn contact_self_signature_set(&mut self, signature: String) -> Result<(), PuppetError>;
 
     async fn tag_contact_add(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError>;
@@ -592,7 +669,7 @@ pub trait PuppetImpl {
     async fn tag_list(&mut self) -> Result<Vec<String>, PuppetError>;
 
     async fn contact_alias(&mut self, contact_id: String) -> Result<String, PuppetError>;
-    async fn contact_alias_set(&mut self, contact_id: String, alias: Option<String>) -> Result<(), PuppetError>;
+    async fn contact_alias_set(&mut self, contact_id: String, alias: String) -> Result<(), PuppetError>;
     async fn contact_avatar(&mut self, contact_id: String) -> Result<FileBox, PuppetError>;
     async fn contact_avatar_set(&mut self, contact_id: String, file: FileBox) -> Result<(), PuppetError>;
     async fn contact_phone_set(&mut self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError>;
@@ -649,11 +726,15 @@ pub trait PuppetImpl {
     async fn friendship_raw_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError>;
 
     async fn room_invitation_accept(&mut self, room_invitation_id: String) -> Result<(), PuppetError>;
-    async fn room_invitation_raw_payload(&mut self, room_invitation_id: String) -> Result<RoomInvitationPayload, PuppetError>;
+    async fn room_invitation_raw_payload(
+        &mut self,
+        room_invitation_id: String,
+    ) -> Result<RoomInvitationPayload, PuppetError>;
 
     async fn room_add(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
     async fn room_avatar(&mut self, room_id: String) -> Result<FileBox, PuppetError>;
-    async fn room_create(&mut self, contact_id_list: Vec<String>, topic: Option<String>) -> Result<String, PuppetError>;
+    async fn room_create(&mut self, contact_id_list: Vec<String>, topic: Option<String>)
+                         -> Result<String, PuppetError>;
     async fn room_del(&mut self, room_id: String) -> Result<(), PuppetError>;
     async fn room_qrcode(&mut self, room_id: String) -> Result<String, PuppetError>;
     async fn room_quit(&mut self, room_id: String) -> Result<(), PuppetError>;
@@ -665,5 +746,9 @@ pub trait PuppetImpl {
     async fn room_announce(&mut self, room_id: String) -> Result<String, PuppetError>;
     async fn room_announce_set(&mut self, room_id: String, text: String) -> Result<(), PuppetError>;
     async fn room_member_list(&mut self, room_id: String) -> Result<Vec<String>, PuppetError>;
-    async fn room_member_raw_payload(&mut self, room_id: String, contact_id: String) -> Result<RoomMemberPayload, PuppetError>;
+    async fn room_member_raw_payload(
+        &mut self,
+        room_id: String,
+        contact_id: String,
+    ) -> Result<RoomMemberPayload, PuppetError>;
 }
