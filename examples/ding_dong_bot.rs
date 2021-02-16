@@ -1,5 +1,10 @@
-use wechaty::{wechaty_rt, PuppetOptions, Wechaty};
+use wechaty::{wechaty_rt, EventListener, PuppetOptions, Wechaty};
+use wechaty_puppet::EventDongPayload;
 use wechaty_puppet_service::PuppetService;
+
+async fn handle_dong(payload: EventDongPayload) {
+    println!("{}", payload.data);
+}
 
 #[wechaty_rt::main]
 async fn main() {
@@ -14,4 +19,5 @@ async fn main() {
         .await
         .unwrap(),
     );
+    bot.on_dong(handle_dong);
 }

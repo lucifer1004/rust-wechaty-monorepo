@@ -17,7 +17,7 @@ where
             func: Box::new(move |t: T| Box::pin(f(t))),
         }
     }
-    pub(crate) async fn run(&self, t: T) -> R {
+    pub async fn run(&self, t: T) -> R {
         (self.func)(t).await
     }
 }

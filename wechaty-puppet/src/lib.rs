@@ -7,7 +7,9 @@ pub mod puppet;
 pub mod schemas;
 pub mod types;
 
+pub use events::PuppetEvent;
 pub use puppet::{Puppet, PuppetImpl};
+pub use schemas::event::*;
 pub use schemas::puppet::PuppetOptions;
 pub use types::{AsyncFnPtr, IntoAsyncFnPtr};
 

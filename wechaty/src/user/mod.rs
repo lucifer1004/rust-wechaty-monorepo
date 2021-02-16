@@ -1,0 +1,14 @@
+mod contact;
+mod contact_self;
+mod favorite;
+mod friendship;
+mod image;
+mod location;
+mod message;
+mod mini_program;
+mod moment;
+mod money;
+mod room;
+mod room_invitation;
+mod tag;
+mod url_link;
