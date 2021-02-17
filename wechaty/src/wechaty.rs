@@ -1,10 +1,8 @@
-use std::sync::{Arc, Mutex};
-
 use actix::{Actor, Addr, Recipient};
 use tokio::signal;
 use wechaty_puppet::{Puppet, PuppetEvent, PuppetImpl};
 
-use crate::{EventListener, EventListenerInner, WechatyContext, WechatyPool, Command};
+use crate::{Command, EventListener, EventListenerInner, WechatyContext};
 
 type WechatyListener<T> = EventListenerInner<T>;
 
@@ -22,11 +20,7 @@ where
     T: 'static + PuppetImpl + Clone + Unpin,
 {
     pub fn new(puppet: Puppet<T>) -> Self {
-        let pool_ptr = Arc::new(Mutex::new(WechatyPool::new()));
-        let listener = EventListenerInner::new(
-            "Wechaty".to_owned(),
-            WechatyContext::new(puppet.clone(), pool_ptr.clone()),
-        );
+        let listener = EventListenerInner::new("Wechaty".to_owned(), WechatyContext::new(puppet.clone()));
         let addr = listener.clone().start();
         Self { puppet, addr, listener }
     }

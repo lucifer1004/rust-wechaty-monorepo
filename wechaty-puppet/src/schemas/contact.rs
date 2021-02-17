@@ -40,7 +40,7 @@ pub struct ContactPayload {
     pub phone: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub struct ContactQueryFilter {
     pub alias: Option<String>,
     pub alias_regex: Option<Regex>,

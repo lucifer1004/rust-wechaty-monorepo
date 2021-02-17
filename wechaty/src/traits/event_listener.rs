@@ -1,15 +1,14 @@
 use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 
 use actix::{
     Actor, ActorContext, ActorFuture, AtomicResponse, Context, Handler, Message as ActorMessage, Recipient, WrapFuture,
 };
 use log::{error, info};
-use wechaty_puppet::{AsyncFnPtr, IntoAsyncFnPtr, Puppet, PuppetEvent, PuppetImpl, Subscribe};
+use wechaty_puppet::{AsyncFnPtr, ContactPayload, IntoAsyncFnPtr, Puppet, PuppetEvent, PuppetImpl, Subscribe};
 
-use crate::{Contact, ContactSelf, DongPayload, LoginPayload, Message, MessagePayload, WechatyContext};
+use crate::{Contact, DongPayload, LoginPayload, Message, MessagePayload, WechatyContext};
 
 #[derive(ActorMessage)]
 #[rtype("()")]
@@ -132,6 +131,23 @@ where
     }
 }
 
+async fn trigger_handlers<T, Payload: Clone + 'static>(
+    ctx: WechatyContext<T>,
+    payload: Payload,
+    handlers: HandlersPtr<T, Payload>,
+) where
+    T: 'static + PuppetImpl + Clone + Unpin,
+{
+    let len = handlers.borrow_mut().len();
+    for i in 0..len {
+        let mut handler = &mut handlers.borrow_mut()[i];
+        if handler.1 > 0 {
+            handler.0.run(payload.clone(), ctx.clone()).await;
+            handler.1 -= 1;
+        }
+    }
+}
+
 impl<T> Handler<PuppetEvent> for EventListenerInner<T>
 where
     T: 'static + PuppetImpl + Clone + Unpin,
@@ -139,27 +155,25 @@ where
     type Result = AtomicResponse<Self, ()>;
 
     fn handle(&mut self, msg: PuppetEvent, _ctx: &mut Context<Self>) -> Self::Result {
+        let ctx = self.ctx.clone();
         match msg {
             PuppetEvent::Dong(payload) => {
-                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(|_, this, _| {
-                    this.trigger_handlers(payload, this.dong_handlers.clone())
-                        .into_actor(this)
+                let payload = payload.clone();
+                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
+                    trigger_handlers(ctx, payload, this.dong_handlers.clone()).into_actor(this)
                 })))
             }
             PuppetEvent::Login(payload) => {
-                let payload = ContactSelf::new(payload.contact_id, self.ctx.clone());
-
-                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(|_, this, _| {
-                    this.trigger_handlers(payload, this.login_handlers.clone())
-                        .into_actor(this)
+                self.ctx.set_id(payload.contact_id.clone());
+                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
+                    this.trigger_login_handlers(payload.contact_id.clone()).into_actor(this)
                 })))
             }
             PuppetEvent::Message(payload) => {
                 let payload = MessagePayload { message: Message {} };
 
-                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(|_, this, _| {
-                    this.trigger_handlers(payload, this.message_handlers.clone())
-                        .into_actor(this)
+                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
+                    trigger_handlers(ctx, payload, this.message_handlers.clone()).into_actor(this)
                 })))
             }
             _ => AtomicResponse::new(Box::pin(async {}.into_actor(self))),
@@ -194,21 +208,13 @@ where
         }
     }
 
-    fn trigger_handlers<Payload: Clone + 'static>(
-        &mut self,
-        payload: Payload,
-        handlers: HandlersPtr<T, Payload>,
-    ) -> impl Future<Output = ()> + 'static {
-        let len = handlers.borrow_mut().len();
+    fn trigger_login_handlers(&mut self, contact_id: String) -> impl Future<Output = ()> + 'static {
+        let mut contact = Contact::new(contact_id.clone(), self.ctx.clone(), None);
         let ctx = self.ctx.clone();
+        let handlers = self.login_handlers.clone();
         async move {
-            for i in 0..len {
-                let mut handler = &mut handlers.borrow_mut()[i];
-                if handler.1 > 0 {
-                    handler.0.run(payload.clone(), ctx.clone()).await;
-                    handler.1 -= 1;
-                }
-            }
+            contact.sync().await;
+            trigger_handlers(ctx, LoginPayload { contact }, handlers).await
         }
     }
 }

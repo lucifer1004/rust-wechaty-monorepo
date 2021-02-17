@@ -1,10 +1,16 @@
 use wechaty_puppet::{EventDongPayload, PuppetImpl};
 
-use crate::{ContactSelf, Message};
+use crate::{Contact, Message};
 
 pub type DongPayload = EventDongPayload;
 
-pub type LoginPayload<T> = ContactSelf<T>;
+#[derive(Clone, Debug)]
+pub struct LoginPayload<T>
+where
+    T: 'static + PuppetImpl + Clone + Unpin,
+{
+    pub contact: Contact<T>,
+}
 
 #[derive(Clone, Debug)]
 pub struct MessagePayload {

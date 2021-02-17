@@ -1,5 +1,4 @@
 pub(crate) mod contact;
-pub(crate) mod contact_self;
 pub(crate) mod favorite;
 pub(crate) mod friendship;
 pub(crate) mod image;
