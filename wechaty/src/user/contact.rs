@@ -21,6 +21,13 @@ where
 {
     pub(crate) fn new(id: String, ctx: WechatyContext<T>, payload: Option<ContactPayload>) -> Self {
         debug!("create contact {}", id);
+        let payload = match payload {
+            Some(_) => payload,
+            None => match ctx.contacts().get(&id) {
+                Some(payload) => Some(payload.clone()),
+                None => None,
+            },
+        };
         Self {
             id_: id,
             ctx,

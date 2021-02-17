@@ -13,6 +13,9 @@ where
 }
 
 #[derive(Clone, Debug)]
-pub struct MessagePayload {
-    pub message: Message,
+pub struct MessagePayload<T>
+where
+    T: 'static + PuppetImpl + Clone + Unpin,
+{
+    pub message: Message<T>,
 }

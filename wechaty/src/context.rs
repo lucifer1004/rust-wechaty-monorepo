@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use log::{debug, error};
 use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetError, PuppetImpl};
 
-use crate::Contact;
+use crate::{Contact, Message};
 
 #[derive(Clone)]
 pub struct WechatyContext<T>
@@ -52,11 +52,9 @@ where
 
     pub async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, PuppetError> {
         let payload = {
-            let contacts = self.contacts();
-            if contacts.contains_key(&contact_id) {
-                Some(contacts.get(&contact_id).unwrap().clone())
-            } else {
-                None
+            match self.contacts().get(&contact_id) {
+                Some(payload) => Some(payload.clone()),
+                None => None,
             }
         };
         match payload {
@@ -117,6 +115,25 @@ where
                 Ok(contact_list)
             }
             Err(e) => Err(e),
+        }
+    }
+
+    pub async fn message_load(&self, message_id: String) -> Result<Message<T>, PuppetError> {
+        let payload = {
+            match self.messages().get(&message_id) {
+                Some(payload) => Some(payload.clone()),
+                None => None,
+            }
+        };
+        match payload {
+            Some(payload) => Ok(Message::new(message_id.clone(), self.clone(), Some(payload))),
+            None => {
+                let mut message = Message::new(message_id.clone(), self.clone(), None);
+                if let Err(e) = message.ready().await {
+                    return Err(e);
+                }
+                Ok(message)
+            }
         }
     }
 

@@ -8,12 +8,11 @@ use wechaty_puppet_service::PuppetService;
 async fn main() {
     env_logger::init();
     let endpoint = env!("WECHATY_ENDPOINT");
-    let token = env!("WECHATY_TOKEN");
     let mut bot = Wechaty::new(
         PuppetService::new(PuppetOptions {
             endpoint: Some(endpoint.to_owned()),
             timeout: None,
-            token: Some(token.to_owned()),
+            token: None,
         })
         .await
         .unwrap(),
@@ -22,10 +21,12 @@ async fn main() {
     bot.on_dong(async move |payload: DongPayload, ctx| println!("{}", payload.data))
         .on_login(
             async move |mut payload: LoginPayload<PuppetService>, mut ctx: WechatyContext<PuppetService>| {
-                println!("{:?}", ctx.contact_find_all(None).await.unwrap());
+                println!("Contact list: {:?}", ctx.contact_find_all(None).await.unwrap());
             },
         )
-        .on_message(async move |payload: MessagePayload, ctx| println!("{:?}", payload.message))
+        .on_message(async move |payload: MessagePayload<PuppetService>, ctx| {
+            println!("{}", payload.message);
+        })
         .start()
         .await;
 }
