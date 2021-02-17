@@ -31,9 +31,4 @@ pub use crate::wechaty::Wechaty;
 pub(crate) use crate::traits::event_listener::EventListenerInner;
 
 #[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}
+mod tests {}

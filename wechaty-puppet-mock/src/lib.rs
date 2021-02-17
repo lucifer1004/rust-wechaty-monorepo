@@ -1,3 +1,5 @@
+mod puppet_mock;
+
 #[cfg(test)]
 mod tests {
     #[test]

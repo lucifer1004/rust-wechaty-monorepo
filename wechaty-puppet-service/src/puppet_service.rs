@@ -7,25 +7,8 @@ use serde_json::{from_str, to_string};
 use tonic::{transport::Channel, Status, Streaming};
 use wechaty_grpc::puppet::*;
 use wechaty_grpc::puppet_client::PuppetClient;
-use wechaty_puppet::error::PuppetError;
-use wechaty_puppet::events::PuppetEvent;
-use wechaty_puppet::puppet::{FileBox, Puppet, PuppetImpl};
-use wechaty_puppet::schemas::contact::ContactPayload;
-use wechaty_puppet::schemas::event::{
-    EventDirtyPayload, EventDongPayload, EventErrorPayload, EventFriendshipPayload, EventHeartbeatPayload,
-    EventLoginPayload, EventLogoutPayload, EventMessagePayload, EventReadyPayload, EventResetPayload,
-    EventRoomInvitePayload, EventRoomJoinPayload, EventRoomLeavePayload, EventRoomTopicPayload, EventScanPayload,
-    ScanStatus,
-};
-use wechaty_puppet::schemas::friendship::FriendshipPayload;
-use wechaty_puppet::schemas::image::ImageType;
-use wechaty_puppet::schemas::message::MessagePayload;
-use wechaty_puppet::schemas::mini_program::MiniProgramPayload;
-use wechaty_puppet::schemas::payload::PayloadType;
-use wechaty_puppet::schemas::puppet::PuppetOptions;
-use wechaty_puppet::schemas::room::{RoomMemberPayload, RoomPayload};
-use wechaty_puppet::schemas::room_invitation::RoomInvitationPayload;
-use wechaty_puppet::schemas::url_link::UrlLinkPayload;
+use wechaty_puppet::*;
+use wechaty_puppet::{ImageType, PayloadType};
 
 use crate::from_payload_response::FromPayloadResponse;
 use crate::service_endpoint::discover;

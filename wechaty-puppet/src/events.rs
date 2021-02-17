@@ -1,7 +1,7 @@
 use actix::Message;
 
 use crate::schemas::event::*;
-use crate::types::AsyncFnPtr;
+// use crate::types::AsyncFnPtr;
 
 // pub type PuppetDirtyListener = AsyncFnPtr<EventDirtyPayload, ()>;
 // pub type PuppetDongListener = AsyncFnPtr<EventDongPayload, ()>;

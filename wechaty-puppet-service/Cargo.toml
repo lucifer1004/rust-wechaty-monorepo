@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 actix = "0.11.0-beta.2"
-actix-rt = "2.0"
+actix-rt = "2"
 async-trait = "0.1"
 log = "0.4"
 num-traits = "0.2"

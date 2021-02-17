@@ -4,7 +4,7 @@ use actix::{Actor, Addr, Recipient};
 use tokio::signal;
 use wechaty_puppet::{Puppet, PuppetEvent, PuppetImpl};
 
-use crate::{EventListener, EventListenerInner, WechatyContext};
+use crate::{EventListener, EventListenerInner, WechatyContext, WechatyPool};
 
 type WechatyListener<T> = EventListenerInner<WechatyContext<T>>;
 
@@ -23,7 +23,11 @@ where
 {
     pub fn new(puppet: Puppet<T>) -> Self {
         let puppet_ptr = Arc::new(Mutex::new(puppet));
-        let listener = EventListenerInner::new("Wechaty".to_owned(), WechatyContext::new(puppet_ptr.clone()));
+        let pool_ptr = Arc::new(Mutex::new(WechatyPool::new()));
+        let listener = EventListenerInner::new(
+            "Wechaty".to_owned(),
+            WechatyContext::new(puppet_ptr.clone(), pool_ptr.clone()),
+        );
         let addr = listener.clone().start();
         Self {
             puppet: puppet_ptr,
