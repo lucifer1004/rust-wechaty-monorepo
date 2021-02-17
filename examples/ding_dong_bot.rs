@@ -1,10 +1,7 @@
-use wechaty::{wechaty_rt, EventListener, PuppetOptions, Wechaty};
-use wechaty_puppet::EventDongPayload;
-use wechaty_puppet_service::PuppetService;
+#![feature(async_closure)]
 
-async fn handle_dong(payload: EventDongPayload) {
-    println!("{}", payload.data);
-}
+use wechaty::{wechaty_rt, DongPayload, EventListener, LoginPayload, MessagePayload, PuppetOptions, Wechaty};
+use wechaty_puppet_service::PuppetService;
 
 #[wechaty_rt::main]
 async fn main() {
@@ -19,5 +16,10 @@ async fn main() {
         .await
         .unwrap(),
     );
-    bot.on_dong(handle_dong);
+
+    bot.on_dong(async move |payload: DongPayload, ctx| println!("{}", payload.data))
+        .on_login(async move |payload: LoginPayload, ctx| println!("{:?}", payload.contact_self))
+        .on_message(async move |payload: MessagePayload, ctx| println!("{:?}", payload.message))
+        .start()
+        .await;
 }

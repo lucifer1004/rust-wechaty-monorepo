@@ -8,7 +8,8 @@ pub mod schemas;
 pub mod types;
 
 pub use events::PuppetEvent;
-pub use puppet::{Puppet, PuppetImpl};
+pub use puppet::{Puppet, PuppetImpl, Subscribe, UnSubscribe};
+pub use schemas::contact::ContactQueryFilter;
 pub use schemas::event::*;
 pub use schemas::puppet::PuppetOptions;
 pub use types::{AsyncFnPtr, IntoAsyncFnPtr};

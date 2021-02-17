@@ -30,9 +30,10 @@ use wechaty_puppet::schemas::url_link::UrlLinkPayload;
 use crate::from_payload_response::FromPayloadResponse;
 use crate::service_endpoint::discover;
 
+#[derive(Clone)]
 pub struct PuppetService {
     client: PuppetClient<Channel>,
-    inner: Addr<PuppetServiceInner>,
+    addr: Addr<PuppetServiceInner>,
 }
 
 impl PuppetService {
@@ -55,18 +56,20 @@ impl PuppetService {
 
         match PuppetClient::connect(endpoint.clone()).await {
             Ok(mut client) => {
+                info!("Connected to endpoint {}", endpoint);
                 let response = client.event(EventRequest {}).await;
                 match response {
                     Ok(response) => {
-                        let inner = PuppetServiceInner::new().start();
+                        info!("Subscribed event stream");
+                        let addr = PuppetServiceInner::new().start();
                         let puppet_service = Self {
                             client,
-                            inner: inner.clone(),
+                            addr: addr.clone(),
                         };
                         let puppet = Puppet::new(puppet_service);
                         let callback_addr = puppet.self_addr();
-                        inner.do_send(PuppetServiceInternalMessage::SetupCallback(callback_addr));
-                        inner.do_send(PuppetServiceInternalMessage::SetupStream(response.into_inner()));
+                        addr.do_send(PuppetServiceInternalMessage::SetupCallback(callback_addr));
+                        addr.do_send(PuppetServiceInternalMessage::SetupStream(response.into_inner()));
                         Ok(puppet)
                     }
                     Err(e) => panic!("Failed to establish event stream, {}", e),
