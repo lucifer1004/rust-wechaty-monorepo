@@ -1,7 +1,6 @@
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Context, Handler, Message, Recipient};
 use async_trait::async_trait;
@@ -48,7 +47,7 @@ impl From<String> for FileBox {
     }
 }
 
-type LruCachePtr<T> = Rc<RefCell<LruCache<String, T>>>;
+type LruCachePtr<T> = Arc<Mutex<LruCache<String, T>>>;
 
 #[derive(Clone)]
 pub struct Puppet<T>
@@ -57,7 +56,6 @@ where
 {
     puppet_impl: T,
     addr: Addr<PuppetInner>,
-    inner: PuppetInner,
     cache_contact_payload: LruCachePtr<ContactPayload>,
     cache_friendship_payload: LruCachePtr<FriendshipPayload>,
     cache_message_payload: LruCachePtr<MessagePayload>,
@@ -67,7 +65,7 @@ where
     id: Option<String>,
 }
 
-type SubscribersPtr = Rc<RefCell<HashMap<String, Recipient<PuppetEvent>>>>;
+type SubscribersPtr = Arc<Mutex<HashMap<String, Recipient<PuppetEvent>>>>;
 
 #[derive(Message)]
 #[rtype("()")]
@@ -105,25 +103,25 @@ struct PuppetInner {
 impl PuppetInner {
     fn new() -> Self {
         Self {
-            dong_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            error_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            friendship_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            heartbeat_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            login_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            logout_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            message_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            ready_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            reset_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            room_invite_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            room_join_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            room_leave_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            room_topic_subscribers: Rc::new(RefCell::new(HashMap::new())),
-            scan_subscribers: Rc::new(RefCell::new(HashMap::new())),
+            dong_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            error_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            friendship_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            heartbeat_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            login_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            logout_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            message_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            ready_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            reset_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            room_invite_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            room_join_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            room_leave_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            room_topic_subscribers: Arc::new(Mutex::new(HashMap::new())),
+            scan_subscribers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
     fn notify(&self, msg: PuppetEvent, subscribers: SubscribersPtr) {
-        for (name, subscriber) in (*subscribers).borrow_mut().clone() {
+        for (name, subscriber) in subscribers.lock().unwrap().clone() {
             match subscriber.do_send(msg.clone()) {
                 Err(e) => {
                     error!("Failed to notify {} : {}", name, e);
@@ -148,50 +146,51 @@ impl Actor for PuppetInner {
 
 impl Handler<Subscribe> for PuppetInner {
     type Result = ();
+
     fn handle(&mut self, msg: Subscribe, _ctx: &mut Self::Context) -> Self::Result {
         info!("{} is trying to subscribe to {}", msg.name, msg.event_name);
         match msg.event_name {
             "dong" => {
-                self.dong_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.dong_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "error" => {
-                self.error_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.error_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "friendship" => {
-                self.friendship_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.friendship_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "heartbeat" => {
-                self.heartbeat_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.heartbeat_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "login" => {
-                self.login_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.login_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "logout" => {
-                self.logout_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.logout_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "message" => {
-                self.message_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.message_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "ready" => {
-                self.ready_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.ready_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "reset" => {
-                self.reset_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.reset_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "room-invite" => {
-                self.room_invite_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.room_invite_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "room-join" => {
-                self.room_join_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.room_join_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "room-leave" => {
-                self.room_leave_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.room_leave_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "room-topic" => {
-                self.room_topic_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.room_topic_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             "scan" => {
-                self.scan_subscribers.borrow_mut().insert(msg.name, msg.addr);
+                self.scan_subscribers.lock().unwrap().insert(msg.name, msg.addr);
             }
             _ => {
                 error!("Trying to subscribe to unknown event: {}", msg.name);
@@ -202,50 +201,51 @@ impl Handler<Subscribe> for PuppetInner {
 
 impl Handler<UnSubscribe> for PuppetInner {
     type Result = ();
+
     fn handle(&mut self, msg: UnSubscribe, _ctx: &mut Self::Context) -> Self::Result {
         info!("{} is trying to unsubscribe from {}", msg.name, msg.event_name);
         match msg.event_name {
             "dong" => {
-                self.dong_subscribers.borrow_mut().remove(&msg.name);
+                self.dong_subscribers.lock().unwrap().remove(&msg.name);
             }
             "error" => {
-                self.error_subscribers.borrow_mut().remove(&msg.name);
+                self.error_subscribers.lock().unwrap().remove(&msg.name);
             }
             "friendship" => {
-                self.friendship_subscribers.borrow_mut().remove(&msg.name);
+                self.friendship_subscribers.lock().unwrap().remove(&msg.name);
             }
             "heartbeat" => {
-                self.heartbeat_subscribers.borrow_mut().remove(&msg.name);
+                self.heartbeat_subscribers.lock().unwrap().remove(&msg.name);
             }
             "login" => {
-                self.login_subscribers.borrow_mut().remove(&msg.name);
+                self.login_subscribers.lock().unwrap().remove(&msg.name);
             }
             "logout" => {
-                self.logout_subscribers.borrow_mut().remove(&msg.name);
+                self.logout_subscribers.lock().unwrap().remove(&msg.name);
             }
             "message" => {
-                self.message_subscribers.borrow_mut().remove(&msg.name);
+                self.message_subscribers.lock().unwrap().remove(&msg.name);
             }
             "ready" => {
-                self.ready_subscribers.borrow_mut().remove(&msg.name);
+                self.ready_subscribers.lock().unwrap().remove(&msg.name);
             }
             "reset" => {
-                self.reset_subscribers.borrow_mut().remove(&msg.name);
+                self.reset_subscribers.lock().unwrap().remove(&msg.name);
             }
             "room-invite" => {
-                self.room_invite_subscribers.borrow_mut().remove(&msg.name);
+                self.room_invite_subscribers.lock().unwrap().remove(&msg.name);
             }
             "room-join" => {
-                self.room_join_subscribers.borrow_mut().remove(&msg.name);
+                self.room_join_subscribers.lock().unwrap().remove(&msg.name);
             }
             "room-leave" => {
-                self.room_leave_subscribers.borrow_mut().remove(&msg.name);
+                self.room_leave_subscribers.lock().unwrap().remove(&msg.name);
             }
             "room-topic" => {
-                self.room_topic_subscribers.borrow_mut().remove(&msg.name);
+                self.room_topic_subscribers.lock().unwrap().remove(&msg.name);
             }
             "scan" => {
-                self.scan_subscribers.borrow_mut().remove(&msg.name);
+                self.scan_subscribers.lock().unwrap().remove(&msg.name);
             }
             _ => {
                 error!("Trying to unsubscribe from unknown event: {}", msg.name);
@@ -283,19 +283,17 @@ where
     T: PuppetImpl,
 {
     pub fn new(puppet_impl: T) -> Self {
-        let inner = PuppetInner::new();
-        let addr = inner.clone().start();
+        let addr = PuppetInner::new().start();
 
         Self {
             puppet_impl,
             addr,
-            inner,
-            cache_contact_payload: Rc::new(RefCell::new(LruCache::new(DEFAULT_CONTACT_CACHE_CAP))),
-            cache_friendship_payload: Rc::new(RefCell::new(LruCache::new(DEFAULT_FRIENDSHIP_CACHE_CAP))),
-            cache_message_payload: Rc::new(RefCell::new(LruCache::new(DEFAULT_MESSAGE_CACHE_CAP))),
-            cache_room_payload: Rc::new(RefCell::new(LruCache::new(DEFAULT_ROOM_CACHE_CAP))),
-            cache_room_member_payload: Rc::new(RefCell::new(LruCache::new(DEFAULT_ROOM_MEMBER_CACHE_CAP))),
-            cache_room_invitation_payload: Rc::new(RefCell::new(LruCache::new(DEFAULT_ROOM_INVITATION_CACHE_CAP))),
+            cache_contact_payload: Arc::new(Mutex::new(LruCache::new(DEFAULT_CONTACT_CACHE_CAP))),
+            cache_friendship_payload: Arc::new(Mutex::new(LruCache::new(DEFAULT_FRIENDSHIP_CACHE_CAP))),
+            cache_message_payload: Arc::new(Mutex::new(LruCache::new(DEFAULT_MESSAGE_CACHE_CAP))),
+            cache_room_payload: Arc::new(Mutex::new(LruCache::new(DEFAULT_ROOM_CACHE_CAP))),
+            cache_room_member_payload: Arc::new(Mutex::new(LruCache::new(DEFAULT_ROOM_MEMBER_CACHE_CAP))),
+            cache_room_invitation_payload: Arc::new(Mutex::new(LruCache::new(DEFAULT_ROOM_INVITATION_CACHE_CAP))),
             id: None,
         }
     }
@@ -335,12 +333,12 @@ where
     pub async fn contact_payload(&mut self, contact_id: String) -> Result<ContactPayload, PuppetError> {
         debug!("contact_payload(contact_id = {})", contact_id);
         let cache = &*self.cache_contact_payload;
-        if cache.borrow_mut().contains(&contact_id) {
-            Ok(cache.borrow_mut().get(&contact_id).unwrap().clone())
+        if cache.lock().unwrap().contains(&contact_id) {
+            Ok(cache.lock().unwrap().get(&contact_id).unwrap().clone())
         } else {
             match self.puppet_impl.contact_raw_payload(contact_id.clone()).await {
                 Ok(payload) => {
-                    cache.borrow_mut().put(contact_id.clone(), payload.clone());
+                    cache.lock().unwrap().put(contact_id.clone(), payload.clone());
                     Ok(payload)
                 }
                 Err(e) => Err(e),
@@ -472,12 +470,12 @@ where
     pub async fn message_payload(&mut self, message_id: String) -> Result<MessagePayload, PuppetError> {
         debug!("message_payload(message_id = {})", message_id);
         let cache = &*self.cache_message_payload;
-        if cache.borrow_mut().contains(&message_id) {
-            Ok(cache.borrow_mut().get(&message_id).unwrap().clone())
+        if cache.lock().unwrap().contains(&message_id) {
+            Ok(cache.lock().unwrap().get(&message_id).unwrap().clone())
         } else {
             match self.puppet_impl.message_raw_payload(message_id.clone()).await {
                 Ok(payload) => {
-                    cache.borrow_mut().put(message_id.clone(), payload.clone());
+                    cache.lock().unwrap().put(message_id.clone(), payload.clone());
                     Ok(payload)
                 }
                 Err(e) => Err(e),
@@ -488,7 +486,7 @@ where
     pub fn message_list(&self) -> Vec<String> {
         debug!("message_list()");
         let mut message_id_list = vec![];
-        for (key, _val) in self.cache_message_payload.borrow_mut().iter() {
+        for (key, _val) in self.cache_message_payload.lock().unwrap().iter() {
             message_id_list.push(key.clone());
         }
         message_id_list
@@ -624,12 +622,12 @@ where
     pub async fn friendship_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
         debug!("friendship_payload(friendship_id = {})", friendship_id);
         let cache = &*self.cache_friendship_payload;
-        if cache.borrow_mut().contains(&friendship_id) {
-            Ok(cache.borrow_mut().get(&friendship_id).unwrap().clone())
+        if cache.lock().unwrap().contains(&friendship_id) {
+            Ok(cache.lock().unwrap().get(&friendship_id).unwrap().clone())
         } else {
             match self.puppet_impl.friendship_raw_payload(friendship_id.clone()).await {
                 Ok(payload) => {
-                    cache.borrow_mut().put(friendship_id.clone(), payload.clone());
+                    cache.lock().unwrap().put(friendship_id.clone(), payload.clone());
                     Ok(payload)
                 }
                 Err(e) => Err(e),
@@ -648,7 +646,8 @@ where
             friendship_id, new_payload
         );
         (*self.cache_friendship_payload)
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .put(friendship_id, new_payload);
         Ok(())
     }
@@ -664,8 +663,8 @@ where
     ) -> Result<RoomInvitationPayload, PuppetError> {
         debug!("room_invitation_payload(room_invitation_id = {})", room_invitation_id);
         let cache = &*self.cache_room_invitation_payload;
-        if cache.borrow_mut().contains(&room_invitation_id) {
-            Ok(cache.borrow_mut().get(&room_invitation_id).unwrap().clone())
+        if cache.lock().unwrap().contains(&room_invitation_id) {
+            Ok(cache.lock().unwrap().get(&room_invitation_id).unwrap().clone())
         } else {
             match self
                 .puppet_impl
@@ -673,7 +672,7 @@ where
                 .await
             {
                 Ok(payload) => {
-                    cache.borrow_mut().put(room_invitation_id.clone(), payload.clone());
+                    cache.lock().unwrap().put(room_invitation_id.clone(), payload.clone());
                     Ok(payload)
                 }
                 Err(e) => Err(e),
@@ -692,7 +691,8 @@ where
             room_invitation_id, new_payload
         );
         (*self.cache_room_invitation_payload)
-            .borrow_mut()
+            .lock()
+            .unwrap()
             .put(room_invitation_id, new_payload);
         Ok(())
     }
@@ -704,12 +704,12 @@ where
     pub async fn room_payload(&mut self, room_id: String) -> Result<RoomPayload, PuppetError> {
         debug!("room_payload(room_id = {})", room_id);
         let cache = &*self.cache_room_payload;
-        if cache.borrow_mut().contains(&room_id) {
-            Ok(cache.borrow_mut().get(&room_id).unwrap().clone())
+        if cache.lock().unwrap().contains(&room_id) {
+            Ok(cache.lock().unwrap().get(&room_id).unwrap().clone())
         } else {
             match self.puppet_impl.room_raw_payload(room_id.clone()).await {
                 Ok(payload) => {
-                    cache.borrow_mut().put(room_id.clone(), payload.clone());
+                    cache.lock().unwrap().put(room_id.clone(), payload.clone());
                     Ok(payload)
                 }
                 Err(e) => Err(e),
@@ -729,8 +729,8 @@ where
         debug!("room_member_payload(room_id = {}, member_id = {})", room_id, member_id);
         let cache_key = Puppet::<T>::cache_key_room_member(room_id.clone(), member_id.clone());
         let cache = &*self.cache_room_member_payload;
-        if cache.borrow_mut().contains(&cache_key) {
-            Ok(cache.borrow_mut().get(&cache_key).unwrap().clone())
+        if cache.lock().unwrap().contains(&cache_key) {
+            Ok(cache.lock().unwrap().get(&cache_key).unwrap().clone())
         } else {
             match self
                 .puppet_impl
@@ -738,7 +738,7 @@ where
                 .await
             {
                 Ok(payload) => {
-                    cache.borrow_mut().put(cache_key, payload.clone());
+                    cache.lock().unwrap().put(cache_key, payload.clone());
                     Ok(payload)
                 }
                 Err(e) => Err(e),
@@ -797,19 +797,19 @@ where
 
     async fn dirty_payload_message(&mut self, message_id: String) -> Result<(), PuppetError> {
         debug!("dirty_payload_message(message_id = {})", message_id);
-        (*self.cache_message_payload).borrow_mut().pop(&message_id);
+        (*self.cache_message_payload).lock().unwrap().pop(&message_id);
         Ok(())
     }
 
     async fn dirty_payload_contact(&mut self, contact_id: String) -> Result<(), PuppetError> {
         debug!("dirty_payload_contact(contact_id = {})", contact_id);
-        (*self.cache_contact_payload).borrow_mut().pop(&contact_id);
+        (*self.cache_contact_payload).lock().unwrap().pop(&contact_id);
         Ok(())
     }
 
     async fn dirty_payload_room(&mut self, room_id: String) -> Result<(), PuppetError> {
         debug!("dirty_payload_room(room_id = {})", room_id);
-        (*self.cache_contact_payload).borrow_mut().pop(&room_id);
+        (*self.cache_contact_payload).lock().unwrap().pop(&room_id);
         Ok(())
     }
 
@@ -820,7 +820,7 @@ where
             Ok(contact_id_list) => {
                 for contact_id in contact_id_list {
                     let cache_key = Puppet::<T>::cache_key_room_member(room_id.clone(), contact_id);
-                    (*self.cache_room_member_payload).borrow_mut().pop(&cache_key);
+                    (*self.cache_room_member_payload).lock().unwrap().pop(&cache_key);
                 }
                 Ok(())
             }
@@ -830,7 +830,7 @@ where
 
     async fn dirty_payload_friendship(&mut self, friendship_id: String) -> Result<(), PuppetError> {
         debug!("dirty_payload_friendship(friendship_id = {})", friendship_id);
-        (*self.cache_friendship_payload).borrow_mut().pop(&friendship_id);
+        (*self.cache_friendship_payload).lock().unwrap().pop(&friendship_id);
         Ok(())
     }
 

@@ -17,6 +17,7 @@ where
             func: Box::new(move |t: Payload, ctx: Context| Box::pin(f(t, ctx))),
         }
     }
+
     pub async fn run(&self, t: Payload, ctx: Context) -> Result {
         (self.func)(t, ctx).await
     }

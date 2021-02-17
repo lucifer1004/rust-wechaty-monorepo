@@ -12,6 +12,7 @@ pub use crate::context::WechatyContext;
 pub use crate::payload::*;
 pub use crate::pool::WechatyPool;
 pub use crate::traits::event_listener::EventListener;
+pub(crate) use crate::traits::event_listener::{Command, EventListenerInner};
 pub use crate::user::contact::Contact;
 pub use crate::user::contact_self::ContactSelf;
 pub use crate::user::favorite::Favorite;
@@ -27,8 +28,6 @@ pub use crate::user::room_invitation::RoomInvitation;
 pub use crate::user::tag::Tag;
 pub use crate::user::url_link::UrlLink;
 pub use crate::wechaty::Wechaty;
-
-pub(crate) use crate::traits::event_listener::EventListenerInner;
 
 #[cfg(test)]
 mod tests {}

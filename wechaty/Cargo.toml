@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 actix = "0.11.0-beta.2"
 actix-rt = "2.0"
+async-trait = "0.1"
 log = "0.4"
 tokio = "1.2"
 wechaty-puppet = { path = "../wechaty-puppet" }

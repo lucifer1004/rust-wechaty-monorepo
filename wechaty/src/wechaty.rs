@@ -4,36 +4,31 @@ use actix::{Actor, Addr, Recipient};
 use tokio::signal;
 use wechaty_puppet::{Puppet, PuppetEvent, PuppetImpl};
 
-use crate::{EventListener, EventListenerInner, WechatyContext, WechatyPool};
+use crate::{EventListener, EventListenerInner, WechatyContext, WechatyPool, Command};
 
-type WechatyListener<T> = EventListenerInner<WechatyContext<T>>;
+type WechatyListener<T> = EventListenerInner<T>;
 
 pub struct Wechaty<T>
 where
-    T: PuppetImpl + Clone + 'static,
+    T: 'static + PuppetImpl + Clone + Unpin,
 {
-    puppet: Arc<Mutex<Puppet<T>>>,
+    puppet: Puppet<T>,
     listener: WechatyListener<T>,
     addr: Addr<WechatyListener<T>>,
 }
 
 impl<T> Wechaty<T>
 where
-    T: PuppetImpl + Clone + 'static,
+    T: 'static + PuppetImpl + Clone + Unpin,
 {
     pub fn new(puppet: Puppet<T>) -> Self {
-        let puppet_ptr = Arc::new(Mutex::new(puppet));
         let pool_ptr = Arc::new(Mutex::new(WechatyPool::new()));
         let listener = EventListenerInner::new(
             "Wechaty".to_owned(),
-            WechatyContext::new(puppet_ptr.clone(), pool_ptr.clone()),
+            WechatyContext::new(puppet.clone(), pool_ptr.clone()),
         );
         let addr = listener.clone().start();
-        Self {
-            puppet: puppet_ptr,
-            addr,
-            listener,
-        }
+        Self { puppet, addr, listener }
     }
 
     pub async fn start(&self) {
@@ -43,16 +38,16 @@ where
     }
 }
 
-impl<T> EventListener<T, WechatyContext<T>> for Wechaty<T>
+impl<T> EventListener<T> for Wechaty<T>
 where
-    T: PuppetImpl + Clone,
+    T: 'static + PuppetImpl + Clone + Unpin,
 {
-    fn get_listener(&self) -> &EventListenerInner<WechatyContext<T>> {
+    fn get_listener(&self) -> &EventListenerInner<T> {
         &self.listener
     }
 
-    fn get_puppet(&self) -> &Arc<Mutex<Puppet<T>>> {
-        &self.puppet
+    fn get_puppet(&self) -> Puppet<T> {
+        self.puppet.clone()
     }
 
     fn get_addr(&self) -> Recipient<PuppetEvent> {
