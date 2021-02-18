@@ -8,7 +8,7 @@ use actix::{
 use log::{error, info};
 use wechaty_puppet::{AsyncFnPtr, IntoAsyncFnPtr, Puppet, PuppetEvent, PuppetImpl, Subscribe};
 
-use crate::{Contact, DongPayload, LoginPayload, Message, MessagePayload, ScanPayload, WechatyContext, LogoutPayload};
+use crate::{Contact, DongPayload, LoginPayload, LogoutPayload, Message, MessagePayload, ScanPayload, WechatyContext};
 
 #[derive(ActorMessage)]
 #[rtype("()")]
@@ -86,16 +86,16 @@ where
     }
 
     fn on_logout<F>(&mut self, handler: F) -> &mut Self
-        where
-            F: IntoAsyncFnPtr<LogoutPayload<T>, WechatyContext<T>, ()>,
+    where
+        F: IntoAsyncFnPtr<LogoutPayload<T>, WechatyContext<T>, ()>,
     {
         self.on_logout_with_handle(handler, None);
         self
     }
 
     fn on_logout_with_handle<F>(&mut self, handler: F, limit: Option<usize>) -> (&mut Self, usize)
-        where
-            F: IntoAsyncFnPtr<LogoutPayload<T>, WechatyContext<T>, ()>,
+    where
+        F: IntoAsyncFnPtr<LogoutPayload<T>, WechatyContext<T>, ()>,
     {
         let logout_handlers = self.get_listener().logout_handlers.clone();
         self.on_event_with_handle(handler.into(), limit, logout_handlers, "logout")
@@ -206,7 +206,8 @@ where
             PuppetEvent::Logout(payload) => {
                 self.ctx.set_id(payload.contact_id.clone());
                 AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
-                    this.trigger_logout_handlers(payload.contact_id.clone()).into_actor(this)
+                    this.trigger_logout_handlers(payload.contact_id.clone())
+                        .into_actor(this)
                 })))
             }
             PuppetEvent::Message(payload) => {
@@ -218,10 +219,7 @@ where
                 AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
                     trigger_handlers(
                         ctx,
-                        ScanPayload {
-                            qrcode: payload.qrcode,
-                            status: payload.status,
-                        },
+                        ScanPayload::new(payload.qrcode, payload.status),
                         this.scan_handlers.clone(),
                     )
                     .into_actor(this)

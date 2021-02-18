@@ -1,19 +1,11 @@
 use std::fmt;
 
 use log::{debug, error};
-use wechaty_puppet::{MessagePayload, MessageType, PuppetImpl};
+use wechaty_puppet::{ContactPayload, MessagePayload, MessageType, PuppetImpl};
 
-use crate::{Contact, WechatyContext, WechatyError};
+use crate::{Contact, Entity, WechatyContext, WechatyError};
 
-#[derive(Clone)]
-pub struct Message<T>
-where
-    T: 'static + PuppetImpl + Clone + Unpin + Send,
-{
-    ctx: WechatyContext<T>,
-    id_: String,
-    payload_: Option<MessagePayload>,
-}
+pub type Message<T> = Entity<T, MessagePayload>;
 
 impl<T> Message<T>
 where
@@ -70,7 +62,9 @@ where
                     if !payload.to_id.is_empty() {
                         self.ctx.contact_load(payload.to_id.clone()).await;
                     }
-                    if !payload.room_id.is_empty() {}
+                    if !payload.room_id.is_empty() {
+                        self.ctx.room_load(payload.room_id.clone()).await;
+                    }
                     Ok(())
                 }
                 Err(e) => {
@@ -84,6 +78,22 @@ where
     pub fn id(&self) -> String {
         debug!("message.id(id = {})", self.id_);
         self.id_.clone()
+    }
+
+    pub fn conversation_id(&self) -> Option<String> {
+        debug!("message.conversation_id(id = {})", self.id_);
+        if self.is_ready() {
+            let payload = self.payload().unwrap();
+            if !payload.room_id.is_empty() {
+                Some(payload.room_id)
+            } else if !payload.from_id.is_empty() {
+                Some(payload.from_id)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
     }
 
     pub fn payload(&self) -> Option<MessagePayload> {
@@ -155,13 +165,17 @@ where
             Some(contact) => format!("{}", contact),
             None => String::new(),
         };
+        let message_type = match self.message_type() {
+            Some(message_type) => format!("{:?}", message_type),
+            None => String::new(),
+        };
         let text = if self.is_ready() && self.message_type().unwrap() == MessageType::Text {
             let text = self.text().unwrap().chars().collect::<Vec<_>>();
             let len = text.len().min(70);
-            text[0..len].iter().collect::<String>()
+            format!(", Text: {}", text[0..len].iter().collect::<String>())
         } else {
             String::new()
         };
-        write!(fmt, "From: {}, To: {}, Text: {}", from, to, text)
+        write!(fmt, "From: {}, To: {}, Type: {}{}", from, to, message_type, text)
     }
 }

@@ -6,17 +6,10 @@ use wechaty_puppet::{
     UrlLinkPayload,
 };
 
+use crate::user::entity::Entity;
 use crate::{Message, WechatyContext, WechatyError};
 
-#[derive(Clone)]
-pub struct Contact<T>
-where
-    T: 'static + PuppetImpl + Clone + Unpin + Send,
-{
-    ctx: WechatyContext<T>,
-    id_: String,
-    payload_: Option<ContactPayload>,
-}
+pub type Contact<T> = Entity<T, ContactPayload>;
 
 impl<T> Contact<T>
 where

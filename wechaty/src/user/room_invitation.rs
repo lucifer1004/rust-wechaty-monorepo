@@ -1,2 +1,5 @@
-#[derive(Clone, Debug)]
-pub struct RoomInvitation {}
+use wechaty_puppet::RoomInvitationPayload;
+
+use crate::Entity;
+
+pub type RoomInvitation<T> = Entity<T, RoomInvitationPayload>;

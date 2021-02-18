@@ -14,12 +14,11 @@ where
 
 #[derive(Clone, Debug)]
 pub struct LogoutPayload<T>
-    where
-        T: 'static + PuppetImpl + Clone + Unpin + Send,
+where
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     pub contact: Contact<T>,
 }
-
 
 #[derive(Clone, Debug)]
 pub struct MessagePayload<T>
@@ -33,4 +32,10 @@ where
 pub struct ScanPayload {
     pub qrcode: Option<String>,
     pub status: ScanStatus,
+}
+
+impl ScanPayload {
+    pub fn new(qrcode: Option<String>, status: ScanStatus) -> Self {
+        Self { qrcode, status }
+    }
 }

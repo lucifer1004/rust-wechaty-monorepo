@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use log::{debug, error};
 use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetImpl};
 
-use crate::{Contact, Message, WechatyError};
+use crate::{Contact, Message, Room, WechatyError};
 
 #[derive(Clone)]
 pub struct WechatyContext<T>
@@ -140,6 +140,10 @@ where
     pub fn message_find(&self) {}
 
     pub fn message_find_all(&self) {}
+
+    pub async fn room_load(&self, room_id: String) -> Result<Room<T>, WechatyError> {
+        unimplemented!()
+    }
 
     pub fn room_create(&self) {}
 
