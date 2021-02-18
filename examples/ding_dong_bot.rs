@@ -1,20 +1,17 @@
 #![feature(async_closure)]
+use std::env;
 use wechaty::{wechaty_rt, EventListener, LoginPayload, MessagePayload, MessageType, PuppetOptions, ScanPayload, Wechaty, WechatyContext, LogoutPayload};
 use wechaty_puppet_service::PuppetService;
 
 #[wechaty_rt::main]
 async fn main() {
     env_logger::init();
-    let endpoint = env!("WECHATY_ENDPOINT");
-    let mut bot = Wechaty::new(
-        PuppetService::new(PuppetOptions {
-            endpoint: Some(endpoint.to_owned()),
-            timeout: None,
-            token: None,
-        })
-        .await
-        .unwrap(),
-    );
+    let options = PuppetOptions {
+        endpoint: match env::var("WECHATY_ENDPOINT") { Ok(endpoint) => Some(endpoint), Err(_) => None},
+        timeout: None,
+        token: match env::var("WECHATY_TOKEN") { Ok(endpoint) => Some(endpoint), Err(_) => None},
+    };
+    let mut bot = Wechaty::new(PuppetService::new(options).await.unwrap());
 
     bot.on_scan(async move |payload: ScanPayload, ctx| {
         if let Some(qrcode) = payload.qrcode {

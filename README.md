@@ -35,3 +35,11 @@ See more at [Wiki:Voice Of Developer](https://github.com/Wechaty/wechaty/wiki/Vo
 - Code & Docs © 2018 Wechaty Contributors <https://github.com/wechaty>
 - Code released under the Apache-2.0 License
 - Docs released under Creative Commons
+
+## Examples
+
+### Ding-dong bot
+
+```shell
+RUST
+```
