@@ -53,7 +53,12 @@ where
         self.id_ = Some(id);
     }
 
+    /// Load a contact.
+    ///
+    /// Use contact store first, if the contact cannot be found in the local store,
+    /// try to fetch from the puppet instead.
     pub(crate) async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, WechatyError> {
+        debug!("contact_load(query = {})", contact_id);
         let payload = {
             match self.contacts().get(&contact_id) {
                 Some(payload) => Some(payload.clone()),
@@ -72,7 +77,13 @@ where
         }
     }
 
-    pub async fn contact_find(&self) {
+    /// Find a contact by query
+    pub async fn contact_find(&self, query: ContactQueryFilter) {
+        unimplemented!()
+    }
+
+    /// Find a contact by string
+    pub async fn contact_find_by_string(&self, query_str: String) {
         unimplemented!()
     }
 
@@ -120,7 +131,12 @@ where
         }
     }
 
+    /// Load a message.
+    ///
+    /// Use message store first, if the message cannot be found in the local store,
+    /// try to fetch from the puppet instead.
     pub async fn message_load(&self, message_id: String) -> Result<Message<T>, WechatyError> {
+        debug!("message_load(query = {})", message_id);
         let payload = {
             match self.messages().get(&message_id) {
                 Some(payload) => Some(payload.clone()),
