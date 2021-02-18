@@ -1,8 +1,6 @@
 use std::collections::HashMap;
-use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use futures::future::join_all;
 use futures::StreamExt;
 use log::{debug, error};
 use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetImpl};
@@ -70,6 +68,7 @@ where
             None => {
                 let mut contact = Contact::new(contact_id.clone(), self.clone(), None);
                 if let Err(e) = contact.sync().await {
+                    error!("Failed to get payload of contact {}", contact_id);
                     return Err(e);
                 }
                 Ok(contact)
