@@ -1,7 +1,7 @@
 use std::fmt;
 
 use log::{debug, error};
-use wechaty_puppet::{MessagePayload, MessageType, PayloadType, PuppetImpl};
+use wechaty_puppet::{MessagePayload, MessageType, PuppetImpl};
 
 use crate::{Contact, WechatyContext, WechatyError};
 

@@ -2,7 +2,7 @@ use actix::{Actor, Addr, Recipient};
 use tokio::signal;
 use wechaty_puppet::{Puppet, PuppetEvent, PuppetImpl};
 
-use crate::{Command, EventListener, EventListenerInner, WechatyContext};
+use crate::{EventListener, EventListenerInner, WechatyContext};
 
 type WechatyListener<T> = EventListenerInner<T>;
 

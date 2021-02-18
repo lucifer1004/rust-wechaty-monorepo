@@ -1,6 +1,5 @@
 #![feature(async_closure)]
-use wechaty::{wechaty_rt, DongPayload, EventListener, LoginPayload, MessagePayload, PuppetOptions, ScanPayload, Wechaty, WechatyContext, LogoutPayload};
-use wechaty_puppet::{UrlLinkPayload, MessageType};
+use wechaty::{wechaty_rt, EventListener, LoginPayload, MessagePayload, MessageType, PuppetOptions, ScanPayload, Wechaty, WechatyContext, LogoutPayload};
 use wechaty_puppet_service::PuppetService;
 
 #[wechaty_rt::main]
@@ -39,11 +38,11 @@ async fn main() {
             return;
         }
         if let Some(message_type) = message.message_type() {
-            if message.text().unwrap() == "ding" {
+            if message_type != MessageType::Text || message.text().unwrap() != "ding" {
+                println!("Message discarded because it does not match ding");
+            } else {
                 message.from().unwrap().send_text("dong".to_owned()).await;
                 println!("REPLY: dong");
-            } else {
-                println!("Message discarded because it does not match ding");
             }
         } else {
             println!("Message discarded because it is not a text");

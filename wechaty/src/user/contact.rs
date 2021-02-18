@@ -150,7 +150,7 @@ where
 
     pub async fn set_alias(&self, new_alias: String) -> Result<(), WechatyError> {
         debug!("contact.set_alias(id = {}, new_alias = {})", self.id_, new_alias);
-        match self.ctx.puppet().contact_alias_set(self.id(), new_alias).await {
+        match self.ctx.puppet().contact_alias_set(self.id(), new_alias.clone()).await {
             Err(e) => {
                 error!("Failed to set alias for {}, reason: {}", self, e);
                 Err(WechatyError::from(e))
@@ -160,7 +160,11 @@ where
                     error!("Failed to dirty payload for {}, reason: {}", self, e);
                 }
                 match self.ctx.puppet().contact_payload(self.id()).await {
-                    Ok(payload) => {}
+                    Ok(payload) => {
+                        if payload.alias != new_alias {
+                            error!("Payload is not correctly set.");
+                        }
+                    }
                     Err(e) => {
                         error!("Failed to verify payload for {}, reason: {}", self, e);
                     }

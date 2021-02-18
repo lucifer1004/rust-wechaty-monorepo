@@ -6,7 +6,7 @@ mod user;
 mod wechaty;
 
 pub use actix_rt as wechaty_rt;
-pub use wechaty_puppet::PuppetOptions;
+pub use wechaty_puppet::{MessageType, PuppetOptions};
 
 pub use crate::context::WechatyContext;
 pub use crate::error::WechatyError;

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use log::{debug, error};
-use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetError, PuppetImpl};
+use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetImpl};
 
 use crate::{Contact, Message, WechatyError};
 
