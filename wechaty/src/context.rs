@@ -1,6 +1,9 @@
 use std::collections::HashMap;
+use std::future::Future;
 use std::sync::{Arc, Mutex, MutexGuard};
 
+use futures::future::join_all;
+use futures::StreamExt;
 use log::{debug, error};
 use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetImpl};
 
@@ -21,7 +24,7 @@ impl<T> WechatyContext<T>
 where
     T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
-    pub fn new(puppet: Puppet<T>) -> Self {
+    pub(crate) fn new(puppet: Puppet<T>) -> Self {
         Self {
             id_: None,
             puppet_: puppet,
@@ -30,27 +33,27 @@ where
         }
     }
 
-    pub fn puppet(&self) -> Puppet<T> {
+    pub(crate) fn puppet(&self) -> Puppet<T> {
         self.puppet_.clone()
     }
 
-    pub fn contacts(&self) -> MutexGuard<HashMap<String, ContactPayload>> {
+    pub(crate) fn contacts(&self) -> MutexGuard<HashMap<String, ContactPayload>> {
         self.contacts_.lock().unwrap()
     }
 
-    pub fn messages(&self) -> MutexGuard<HashMap<String, MessagePayload>> {
+    pub(crate) fn messages(&self) -> MutexGuard<HashMap<String, MessagePayload>> {
         self.messages_.lock().unwrap()
     }
 
-    pub fn id(&self) -> Option<String> {
+    pub(crate) fn id(&self) -> Option<String> {
         self.id_.clone()
     }
 
-    pub fn set_id(&mut self, id: String) {
+    pub(crate) fn set_id(&mut self, id: String) {
         self.id_ = Some(id);
     }
 
-    pub async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, WechatyError> {
+    pub(crate) async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, WechatyError> {
         let payload = {
             match self.contacts().get(&contact_id) {
                 Some(payload) => Some(payload.clone()),
@@ -69,25 +72,35 @@ where
         }
     }
 
-    pub fn contact_find(&self) {}
+    pub async fn contact_find(&self) {
+        unimplemented!()
+    }
+
+    /// Batch load contacts with a default batch size of 16.
+    ///
+    /// Reference: [Batch execution of futures in the tokio runtime](https://users.rust-lang.org/t/batch-execution-of-futures-in-the-tokio-runtime-or-max-number-of-active-futures-at-a-time/47659).
+    ///
+    /// Note the API changes: `tokio::stream::iter` is now temporarily `tokio_stream::iter`, according to
+    /// [tokio's tutorial](https://tokio.rs/tokio/tutorial/streams), it will be moved back to the `tokio`
+    /// crate when the `Stream` trait is stable.
+    async fn contact_load_batch(&mut self, contact_id_list: Vec<String>) -> Vec<Contact<T>> {
+        debug!("contact_load_batch(contact_id_list = {:?})", contact_id_list);
+        let mut contact_list = vec![];
+        let mut stream = tokio_stream::iter(contact_id_list)
+            .map(|contact_id| self.contact_load(contact_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(contact) = result {
+                contact_list.push(contact);
+            }
+        }
+        contact_list
+    }
 
     pub async fn contact_find_all_by_string(&mut self, query_str: String) -> Result<Vec<Contact<T>>, WechatyError> {
         debug!("contact_find_all_by_string(query_str = {:?})", query_str);
         match self.puppet_.contact_search_by_string(query_str, None).await {
-            Ok(contact_id_list) => {
-                let mut contact_list = vec![];
-                for contact_id in contact_id_list {
-                    match self.contact_load(contact_id.clone()).await {
-                        Ok(contact) => {
-                            contact_list.push(contact);
-                        }
-                        Err(e) => {
-                            error! {"Failed to load contact {}: {}", contact_id, e};
-                        }
-                    }
-                }
-                Ok(contact_list)
-            }
+            Ok(contact_id_list) => Ok(self.contact_load_batch(contact_id_list).await),
             Err(e) => Err(WechatyError::from(e)),
         }
     }
@@ -102,18 +115,7 @@ where
             None => ContactQueryFilter::default(),
         };
         match self.puppet_.contact_search(query, None).await {
-            Ok(contact_id_list) => {
-                let mut contact_list = vec![];
-                for contact_id in contact_id_list {
-                    match self.contact_load(contact_id).await {
-                        Ok(contact) => {
-                            contact_list.push(contact);
-                        }
-                        Err(e) => return Err(e),
-                    }
-                }
-                Ok(contact_list)
-            }
+            Ok(contact_id_list) => Ok(self.contact_load_batch(contact_id_list).await),
             Err(e) => Err(WechatyError::from(e)),
         }
     }
@@ -137,11 +139,11 @@ where
         }
     }
 
-    pub fn message_find(&self) {
+    pub async fn message_find(&self) {
         unimplemented!()
     }
 
-    pub fn message_find_all(&self) {
+    pub async fn message_find_all(&self) {
         unimplemented!()
     }
 
@@ -149,19 +151,19 @@ where
         unimplemented!()
     }
 
-    pub fn room_create(&self) {
+    pub async fn room_create(&self) {
         unimplemented!()
     }
 
-    pub fn room_find(&self) {
+    pub async fn room_find(&self) {
         unimplemented!()
     }
 
-    pub fn room_find_all(&self) {
+    pub async fn room_find_all(&self) {
         unimplemented!()
     }
 
-    pub fn friendship_add(&self) {
+    pub async fn friendship_add(&self) {
         unimplemented!()
     }
 }

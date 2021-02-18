@@ -36,4 +36,5 @@ pub struct RoomMemberPayload {
 // FIXME: trait aliases are experimental, see issue #41517 <https://github.com/rust-lang/rust/issues/41517>
 // pub trait RoomPayloadFilterFunction = Fn(RoomPayload) -> bool;
 //
-// pub trait RoomPayloadFilterFactory = Fn(RoomQueryFilter) -> RoomPayloadFilterFunction;
+// pub trait RoomPayloadFilterFactory = Fn(RoomQueryFilter) ->
+// RoomPayloadFilterFunction;

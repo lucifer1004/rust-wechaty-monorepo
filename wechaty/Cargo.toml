@@ -13,8 +13,10 @@ keywords = ["chatbot", "wechaty"]
 actix = "0.11.0-beta.2"
 actix-rt = "2.0"
 async-trait = "0.1"
+futures = "0.3"
 log = "0.4"
 tokio = "1.2"
+tokio-stream = "0.1"
 wechaty-puppet = { path = "../wechaty-puppet" }
 
 [dev-dependencies]

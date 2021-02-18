@@ -53,4 +53,5 @@ pub struct ContactQueryFilter {
 // FIXME: trait aliases are experimental, see issue #41517 <https://github.com/rust-lang/rust/issues/41517>
 // pub trait ContactPayloadFilterFunction = Fn(ContactPayload) -> bool;
 //
-// pub trait ContactPayloadFilterFactory = Fn(ContactQueryFilter) -> ContactPayloadFilterFunction;
+// pub trait ContactPayloadFilterFactory = Fn(ContactQueryFilter) ->
+// ContactPayloadFilterFunction;

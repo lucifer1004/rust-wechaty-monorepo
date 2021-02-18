@@ -101,4 +101,5 @@ pub struct MessageQueryFilter {
 // FIXME: trait aliases are experimental, see issue #41517 <https://github.com/rust-lang/rust/issues/41517>
 // pub trait MessagePayloadFilterFunction = Fn(MessagePayload) -> bool;
 //
-// pub trait MessagePayloadFilterFactory = Fn(MessageQueryFilter) -> MessagePayloadFilterFunction;
+// pub trait MessagePayloadFilterFactory = Fn(MessageQueryFilter) ->
+// MessagePayloadFilterFunction;

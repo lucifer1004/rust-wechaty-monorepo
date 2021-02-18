@@ -31,35 +31,36 @@ async fn main() {
             );
         }
     })
-    .on_login(async move |payload: LoginPayload<PuppetService>, ctx| {
-        println!("User {} has logged in", payload.contact);
-    })
+    .on_login(
+        async move |payload: LoginPayload<PuppetService>, mut ctx: WechatyContext<PuppetService>| {
+            println!("User {} has logged in", payload.contact);
+            println!("Contact list: {:?}", ctx.contact_find_all(None).await);
+        },
+    )
     .on_logout(async move |payload: LogoutPayload<PuppetService>, ctx| {
         println!("User {} has logged out", payload.contact);
     })
-    .on_message(
-        async move |payload: MessagePayload<PuppetService>, ctx| {
-            let message = payload.message;
-            println!("Got message: {}", message);
-            if message.is_self() {
-                println!("Message discarded because its outgoing");
-                return;
-            }
-            if let Some(message_type) = message.message_type() {
-                if message_type != MessageType::Text || message.text().unwrap() != "ding" {
-                    println!("Message discarded because it does not match ding");
-                } else {
-                    if let Err(e) = message.from().unwrap().send_text("dong".to_owned()).await {
-                        println!("Failed to send message");
-                    } else {
-                        println!("REPLY: dong");
-                    }
-                }
+    .on_message(async move |payload: MessagePayload<PuppetService>, ctx| {
+        let message = payload.message;
+        println!("Got message: {}", message);
+        if message.is_self() {
+            println!("Message discarded because its outgoing");
+            return;
+        }
+        if let Some(message_type) = message.message_type() {
+            if message_type != MessageType::Text || message.text().unwrap() != "ding" {
+                println!("Message discarded because it does not match ding");
             } else {
-                println!("Message discarded because it is not a text");
+                if let Err(e) = message.from().unwrap().send_text("dong".to_owned()).await {
+                    println!("Failed to send message");
+                } else {
+                    println!("REPLY: dong");
+                }
             }
-        },
-    )
+        } else {
+            println!("Message discarded because it is not a text");
+        }
+    })
     .start()
     .await;
 }
