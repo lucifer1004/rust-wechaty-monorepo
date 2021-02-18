@@ -1,14 +1,14 @@
 use std::fmt;
 
 use log::{debug, error};
-use wechaty_puppet::{MessagePayload, MessageType, PayloadType, PuppetError, PuppetImpl};
+use wechaty_puppet::{MessagePayload, MessageType, PayloadType, PuppetImpl};
 
-use crate::{Contact, WechatyContext};
+use crate::{Contact, WechatyContext, WechatyError};
 
 #[derive(Clone)]
 pub struct Message<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     ctx: WechatyContext<T>,
     id_: String,
@@ -17,7 +17,7 @@ where
 
 impl<T> Message<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     pub(crate) fn new(id: String, ctx: WechatyContext<T>, payload: Option<MessagePayload>) -> Self {
         debug!("create message {}", id);
@@ -43,7 +43,18 @@ where
         }
     }
 
-    pub(crate) async fn ready(&mut self) -> Result<(), PuppetError> {
+    pub fn is_self(&self) -> bool {
+        if !self.is_ready() {
+            false
+        } else {
+            match self.ctx.id() {
+                Some(id) => self.from().unwrap().id() == id,
+                None => false,
+            }
+        }
+    }
+
+    pub(crate) async fn ready(&mut self) -> Result<(), WechatyError> {
         debug!("message.ready(id = {})", self.id_);
         if self.is_ready() {
             Ok(())
@@ -64,7 +75,7 @@ where
                 }
                 Err(e) => {
                     error!("Error occurred while syncing message {}: {}", self.id_, e);
-                    Err(e)
+                    Err(WechatyError::from(e))
                 }
             }
         }
@@ -124,7 +135,7 @@ where
 
 impl<T> fmt::Debug for Message<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(fmt, "Message({})", self)
@@ -133,10 +144,14 @@ where
 
 impl<T> fmt::Display for Message<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         let from = match self.from() {
+            Some(contact) => format!("{}", contact),
+            None => String::new(),
+        };
+        let to = match self.to() {
             Some(contact) => format!("{}", contact),
             None => String::new(),
         };
@@ -147,6 +162,6 @@ where
         } else {
             String::new()
         };
-        write!(fmt, "From: {}, Text: {}", from, text)
+        write!(fmt, "From: {}, To: {}, Text: {}", from, to, text)
     }
 }

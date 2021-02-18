@@ -52,7 +52,7 @@ type LruCachePtr<T> = Arc<Mutex<LruCache<String, T>>>;
 #[derive(Clone)]
 pub struct Puppet<T>
 where
-    T: PuppetImpl,
+    T: PuppetImpl + Send,
 {
     puppet_impl: T,
     addr: Addr<PuppetInner>,
@@ -280,7 +280,7 @@ impl Handler<PuppetEvent> for PuppetInner {
 
 impl<T> Puppet<T>
 where
-    T: PuppetImpl,
+    T: PuppetImpl + Send,
 {
     pub fn new(puppet_impl: T) -> Self {
         let addr = PuppetInner::new().start();
@@ -845,6 +845,256 @@ where
             PayloadType::Friendship => self.dirty_payload_friendship(id).await,
             PayloadType::Unknown => Err(PuppetError::UnknownPayloadType),
         }
+    }
+}
+
+#[async_trait]
+impl<T> PuppetImpl for Puppet<T>
+where
+    T: PuppetImpl + Send,
+{
+    async fn contact_self_name_set(&mut self, name: String) -> Result<(), PuppetError> {
+        self.puppet_impl.contact_self_name_set(name).await
+    }
+
+    async fn contact_self_qr_code(&mut self) -> Result<String, PuppetError> {
+        self.puppet_impl.contact_self_qr_code().await
+    }
+
+    async fn contact_self_signature_set(&mut self, signature: String) -> Result<(), PuppetError> {
+        self.puppet_impl.contact_self_signature_set(signature).await
+    }
+
+    async fn tag_contact_add(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.tag_contact_add(tag_id, contact_id).await
+    }
+
+    async fn tag_contact_remove(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.tag_contact_remove(tag_id, contact_id).await
+    }
+
+    async fn tag_contact_delete(&mut self, tag_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.tag_contact_delete(tag_id).await
+    }
+
+    async fn tag_contact_list(&mut self, contact_id: String) -> Result<Vec<String>, PuppetError> {
+        self.puppet_impl.tag_contact_list(contact_id).await
+    }
+
+    async fn tag_list(&mut self) -> Result<Vec<String>, PuppetError> {
+        self.puppet_impl.tag_list().await
+    }
+
+    async fn contact_alias(&mut self, contact_id: String) -> Result<String, PuppetError> {
+        self.puppet_impl.contact_alias(contact_id).await
+    }
+
+    async fn contact_alias_set(&mut self, contact_id: String, alias: String) -> Result<(), PuppetError> {
+        self.puppet_impl.contact_alias_set(contact_id, alias).await
+    }
+
+    async fn contact_avatar(&mut self, contact_id: String) -> Result<FileBox, PuppetError> {
+        self.puppet_impl.contact_avatar(contact_id).await
+    }
+
+    async fn contact_avatar_set(&mut self, contact_id: String, file: FileBox) -> Result<(), PuppetError> {
+        self.puppet_impl.contact_avatar_set(contact_id, file).await
+    }
+
+    async fn contact_phone_set(&mut self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError> {
+        self.puppet_impl.contact_phone_set(contact_id, phone_list).await
+    }
+
+    async fn contact_corporation_remark_set(
+        &mut self,
+        contact_id: String,
+        corporation_remark: Option<String>,
+    ) -> Result<(), PuppetError> {
+        self.puppet_impl
+            .contact_corporation_remark_set(contact_id, corporation_remark)
+            .await
+    }
+
+    async fn contact_description_set(
+        &mut self,
+        contact_id: String,
+        description: Option<String>,
+    ) -> Result<(), PuppetError> {
+        self.puppet_impl.contact_description_set(contact_id, description).await
+    }
+
+    async fn contact_list(&mut self) -> Result<Vec<String>, PuppetError> {
+        self.puppet_impl.contact_list().await
+    }
+
+    async fn contact_raw_payload(&mut self, contact_id: String) -> Result<ContactPayload, PuppetError> {
+        self.puppet_impl.contact_raw_payload(contact_id).await
+    }
+
+    async fn message_contact(&mut self, message_id: String) -> Result<String, PuppetError> {
+        self.puppet_impl.message_contact(message_id).await
+    }
+
+    async fn message_file(&mut self, message_id: String) -> Result<FileBox, PuppetError> {
+        self.puppet_impl.message_file(message_id).await
+    }
+
+    async fn message_image(&mut self, message_id: String, image_type: ImageType) -> Result<FileBox, PuppetError> {
+        self.puppet_impl.message_image(message_id, image_type).await
+    }
+
+    async fn message_mini_program(&mut self, message_id: String) -> Result<MiniProgramPayload, PuppetError> {
+        self.puppet_impl.message_mini_program(message_id).await
+    }
+
+    async fn message_url(&mut self, message_id: String) -> Result<UrlLinkPayload, PuppetError> {
+        self.puppet_impl.message_url(message_id).await
+    }
+
+    async fn message_send_contact(
+        &mut self,
+        conversation_id: String,
+        contact_id: String,
+    ) -> Result<Option<String>, PuppetError> {
+        self.puppet_impl.message_send_contact(conversation_id, contact_id).await
+    }
+
+    async fn message_send_file(
+        &mut self,
+        conversation_id: String,
+        file: FileBox,
+    ) -> Result<Option<String>, PuppetError> {
+        self.puppet_impl.message_send_file(conversation_id, file).await
+    }
+
+    async fn message_send_mini_program(
+        &mut self,
+        conversation_id: String,
+        mini_program_payload: MiniProgramPayload,
+    ) -> Result<Option<String>, PuppetError> {
+        self.puppet_impl
+            .message_send_mini_program(conversation_id, mini_program_payload)
+            .await
+    }
+
+    async fn message_send_text(
+        &mut self,
+        conversation_id: String,
+        text: String,
+        mention_id_list: Vec<String>,
+    ) -> Result<Option<String>, PuppetError> {
+        self.puppet_impl
+            .message_send_text(conversation_id, text, mention_id_list)
+            .await
+    }
+
+    async fn message_send_url(
+        &mut self,
+        conversation_id: String,
+        url_link_payload: UrlLinkPayload,
+    ) -> Result<Option<String>, PuppetError> {
+        self.puppet_impl
+            .message_send_url(conversation_id, url_link_payload)
+            .await
+    }
+
+    async fn message_raw_payload(&mut self, message_id: String) -> Result<MessagePayload, PuppetError> {
+        self.puppet_impl.message_raw_payload(message_id).await
+    }
+
+    async fn friendship_accept(&mut self, friendship_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.friendship_accept(friendship_id).await
+    }
+
+    async fn friendship_add(&mut self, contact_id: String, hello: Option<String>) -> Result<(), PuppetError> {
+        self.puppet_impl.friendship_add(contact_id, hello).await
+    }
+
+    async fn friendship_search_phone(&mut self, phone: String) -> Result<Option<String>, PuppetError> {
+        self.puppet_impl.friendship_search_phone(phone).await
+    }
+
+    async fn friendship_search_weixin(&mut self, weixin: String) -> Result<Option<String>, PuppetError> {
+        self.puppet_impl.friendship_search_weixin(weixin).await
+    }
+
+    async fn friendship_raw_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
+        self.puppet_impl.friendship_raw_payload(friendship_id).await
+    }
+
+    async fn room_invitation_accept(&mut self, room_invitation_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.room_invitation_accept(room_invitation_id).await
+    }
+
+    async fn room_invitation_raw_payload(
+        &mut self,
+        room_invitation_id: String,
+    ) -> Result<RoomInvitationPayload, PuppetError> {
+        self.puppet_impl.room_invitation_raw_payload(room_invitation_id).await
+    }
+
+    async fn room_add(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.room_add(room_id, contact_id).await
+    }
+
+    async fn room_avatar(&mut self, room_id: String) -> Result<FileBox, PuppetError> {
+        self.puppet_impl.room_avatar(room_id).await
+    }
+
+    async fn room_create(
+        &mut self,
+        contact_id_list: Vec<String>,
+        topic: Option<String>,
+    ) -> Result<String, PuppetError> {
+        self.puppet_impl.room_create(contact_id_list, topic).await
+    }
+
+    async fn room_del(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.room_del(room_id, contact_id).await
+    }
+
+    async fn room_qr_code(&mut self, room_id: String) -> Result<String, PuppetError> {
+        self.puppet_impl.room_qr_code(room_id).await
+    }
+
+    async fn room_quit(&mut self, room_id: String) -> Result<(), PuppetError> {
+        self.puppet_impl.room_quit(room_id).await
+    }
+
+    async fn room_topic(&mut self, room_id: String) -> Result<String, PuppetError> {
+        self.puppet_impl.room_topic(room_id).await
+    }
+
+    async fn room_topic_set(&mut self, room_id: String, topic: String) -> Result<(), PuppetError> {
+        self.puppet_impl.room_topic_set(room_id, topic).await
+    }
+
+    async fn room_list(&mut self) -> Result<Vec<String>, PuppetError> {
+        self.puppet_impl.room_list().await
+    }
+
+    async fn room_raw_payload(&mut self, room_id: String) -> Result<RoomPayload, PuppetError> {
+        self.puppet_impl.room_raw_payload(room_id).await
+    }
+
+    async fn room_announce(&mut self, room_id: String) -> Result<String, PuppetError> {
+        self.puppet_impl.room_announce(room_id).await
+    }
+
+    async fn room_announce_set(&mut self, room_id: String, text: String) -> Result<(), PuppetError> {
+        self.puppet_impl.room_announce_set(room_id, text).await
+    }
+
+    async fn room_member_list(&mut self, room_id: String) -> Result<Vec<String>, PuppetError> {
+        self.puppet_impl.room_member_list(room_id).await
+    }
+
+    async fn room_member_raw_payload(
+        &mut self,
+        room_id: String,
+        contact_id: String,
+    ) -> Result<RoomMemberPayload, PuppetError> {
+        self.puppet_impl.room_member_raw_payload(room_id, contact_id).await
     }
 }
 

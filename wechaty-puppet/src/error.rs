@@ -27,13 +27,4 @@ impl fmt::Display for PuppetError {
     }
 }
 
-// impl<E> From<E> for PuppetError
-// where
-//     E: error::Error,
-// {
-//     fn from(err: E) -> PuppetError {
-//         PuppetError::Network(format!("{}", err))
-//     }
-// }
-
 impl error::Error for PuppetError {}

@@ -1,4 +1,5 @@
 mod context;
+mod error;
 mod payload;
 mod traits;
 mod user;
@@ -8,6 +9,7 @@ pub use actix_rt as wechaty_rt;
 pub use wechaty_puppet::PuppetOptions;
 
 pub use crate::context::WechatyContext;
+pub use crate::error::WechatyError;
 pub use crate::payload::*;
 pub use crate::traits::event_listener::EventListener;
 pub(crate) use crate::traits::event_listener::{Command, EventListenerInner};

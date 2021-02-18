@@ -8,7 +8,7 @@ use actix::{
 use log::{error, info};
 use wechaty_puppet::{AsyncFnPtr, IntoAsyncFnPtr, Puppet, PuppetEvent, PuppetImpl, Subscribe};
 
-use crate::{Contact, DongPayload, LoginPayload, Message, MessagePayload, WechatyContext};
+use crate::{Contact, DongPayload, LoginPayload, Message, MessagePayload, ScanPayload, WechatyContext, LogoutPayload};
 
 #[derive(ActorMessage)]
 #[rtype("()")]
@@ -18,7 +18,7 @@ pub(crate) enum Command {
 
 pub trait EventListener<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     fn get_listener(&self) -> &EventListenerInner<T>;
     fn get_puppet(&self) -> Puppet<T>;
@@ -85,6 +85,22 @@ where
         self.on_event_with_handle(handler.into(), limit, login_handlers, "login")
     }
 
+    fn on_logout<F>(&mut self, handler: F) -> &mut Self
+        where
+            F: IntoAsyncFnPtr<LogoutPayload<T>, WechatyContext<T>, ()>,
+    {
+        self.on_logout_with_handle(handler, None);
+        self
+    }
+
+    fn on_logout_with_handle<F>(&mut self, handler: F, limit: Option<usize>) -> (&mut Self, usize)
+        where
+            F: IntoAsyncFnPtr<LogoutPayload<T>, WechatyContext<T>, ()>,
+    {
+        let logout_handlers = self.get_listener().logout_handlers.clone();
+        self.on_event_with_handle(handler.into(), limit, logout_handlers, "logout")
+    }
+
     fn on_message<F>(&mut self, handler: F) -> &mut Self
     where
         F: IntoAsyncFnPtr<MessagePayload<T>, WechatyContext<T>, ()>,
@@ -100,6 +116,22 @@ where
         let message_handlers = self.get_listener().message_handlers.clone();
         self.on_event_with_handle(handler.into(), limit, message_handlers, "message")
     }
+
+    fn on_scan<F>(&mut self, handler: F) -> &mut Self
+    where
+        F: IntoAsyncFnPtr<ScanPayload, WechatyContext<T>, ()>,
+    {
+        self.on_scan_with_handle(handler, None);
+        self
+    }
+
+    fn on_scan_with_handle<F>(&mut self, handler: F, limit: Option<usize>) -> (&mut Self, usize)
+    where
+        F: IntoAsyncFnPtr<ScanPayload, WechatyContext<T>, ()>,
+    {
+        let scan_handlers = self.get_listener().scan_handlers.clone();
+        self.on_event_with_handle(handler.into(), limit, scan_handlers, "scan")
+    }
 }
 
 type HandlersPtr<T, Payload> = Rc<RefCell<Vec<(AsyncFnPtr<Payload, WechatyContext<T>, ()>, usize)>>>;
@@ -107,18 +139,20 @@ type HandlersPtr<T, Payload> = Rc<RefCell<Vec<(AsyncFnPtr<Payload, WechatyContex
 #[derive(Clone)]
 pub struct EventListenerInner<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     name: String,
     ctx: WechatyContext<T>,
     dong_handlers: HandlersPtr<T, DongPayload>,
     login_handlers: HandlersPtr<T, LoginPayload<T>>,
+    logout_handlers: HandlersPtr<T, LogoutPayload<T>>,
     message_handlers: HandlersPtr<T, MessagePayload<T>>,
+    scan_handlers: HandlersPtr<T, ScanPayload>,
 }
 
 impl<T> Actor for EventListenerInner<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     type Context = Context<Self>;
 
@@ -136,7 +170,7 @@ async fn trigger_handlers<T, Payload: Clone + 'static>(
     payload: Payload,
     handlers: HandlersPtr<T, Payload>,
 ) where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     let len = handlers.borrow_mut().len();
     for i in 0..len {
@@ -150,15 +184,15 @@ async fn trigger_handlers<T, Payload: Clone + 'static>(
 
 impl<T> Handler<PuppetEvent> for EventListenerInner<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     type Result = AtomicResponse<Self, ()>;
 
     fn handle(&mut self, msg: PuppetEvent, _ctx: &mut Context<Self>) -> Self::Result {
+        info!("{} receives puppet event: {:?}", self.name.clone(), msg);
         let ctx = self.ctx.clone();
         match msg {
             PuppetEvent::Dong(payload) => {
-                let payload = payload.clone();
                 AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
                     trigger_handlers(ctx, payload, this.dong_handlers.clone()).into_actor(this)
                 })))
@@ -169,9 +203,28 @@ where
                     this.trigger_login_handlers(payload.contact_id.clone()).into_actor(this)
                 })))
             }
+            PuppetEvent::Logout(payload) => {
+                self.ctx.set_id(payload.contact_id.clone());
+                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
+                    this.trigger_logout_handlers(payload.contact_id.clone()).into_actor(this)
+                })))
+            }
             PuppetEvent::Message(payload) => {
                 AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
                     this.trigger_message_handlers(payload.message_id).into_actor(this)
+                })))
+            }
+            PuppetEvent::Scan(payload) => {
+                AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
+                    trigger_handlers(
+                        ctx,
+                        ScanPayload {
+                            qrcode: payload.qrcode,
+                            status: payload.status,
+                        },
+                        this.scan_handlers.clone(),
+                    )
+                    .into_actor(this)
                 })))
             }
             _ => AtomicResponse::new(Box::pin(async {}.into_actor(self))),
@@ -181,7 +234,7 @@ where
 
 impl<T> Handler<Command> for EventListenerInner<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     type Result = ();
 
@@ -194,7 +247,7 @@ where
 
 impl<T> EventListenerInner<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     pub(crate) fn new(name: String, ctx: WechatyContext<T>) -> Self {
         Self {
@@ -202,7 +255,9 @@ where
             ctx,
             dong_handlers: Rc::new(RefCell::new(vec![])),
             login_handlers: Rc::new(RefCell::new(vec![])),
+            logout_handlers: Rc::new(RefCell::new(vec![])),
             message_handlers: Rc::new(RefCell::new(vec![])),
+            scan_handlers: Rc::new(RefCell::new(vec![])),
         }
     }
 
@@ -213,6 +268,16 @@ where
         async move {
             contact.sync().await;
             trigger_handlers(ctx, LoginPayload { contact }, handlers).await
+        }
+    }
+
+    fn trigger_logout_handlers(&mut self, contact_id: String) -> impl Future<Output = ()> + 'static {
+        let mut contact = Contact::new(contact_id.clone(), self.ctx.clone(), None);
+        let ctx = self.ctx.clone();
+        let handlers = self.logout_handlers.clone();
+        async move {
+            contact.ready(false).await;
+            trigger_handlers(ctx, LogoutPayload { contact }, handlers).await
         }
     }
 

@@ -8,7 +8,7 @@ type WechatyListener<T> = EventListenerInner<T>;
 
 pub struct Wechaty<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     puppet: Puppet<T>,
     listener: WechatyListener<T>,
@@ -17,7 +17,7 @@ where
 
 impl<T> Wechaty<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     pub fn new(puppet: Puppet<T>) -> Self {
         let listener = EventListenerInner::new("Wechaty".to_owned(), WechatyContext::new(puppet.clone()));
@@ -34,7 +34,7 @@ where
 
 impl<T> EventListener<T> for Wechaty<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     fn get_listener(&self) -> &EventListenerInner<T> {
         &self.listener

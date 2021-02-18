@@ -4,12 +4,12 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use log::{debug, error};
 use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetError, PuppetImpl};
 
-use crate::{Contact, Message};
+use crate::{Contact, Message, WechatyError};
 
 #[derive(Clone)]
 pub struct WechatyContext<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     id_: Option<String>,
     puppet_: Puppet<T>,
@@ -19,7 +19,7 @@ where
 
 impl<T> WechatyContext<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin,
+    T: 'static + PuppetImpl + Clone + Unpin + Send,
 {
     pub fn new(puppet: Puppet<T>) -> Self {
         Self {
@@ -50,7 +50,7 @@ where
         self.id_ = Some(id);
     }
 
-    pub async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, PuppetError> {
+    pub async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, WechatyError> {
         let payload = {
             match self.contacts().get(&contact_id) {
                 Some(payload) => Some(payload.clone()),
@@ -71,7 +71,7 @@ where
 
     pub fn contact_find(&self) {}
 
-    pub async fn contact_find_all_by_string(&mut self, query_str: String) -> Result<Vec<Contact<T>>, PuppetError> {
+    pub async fn contact_find_all_by_string(&mut self, query_str: String) -> Result<Vec<Contact<T>>, WechatyError> {
         debug!("contact_find_all_by_string(query_str = {:?})", query_str);
         match self.puppet_.contact_search_by_string(query_str, None).await {
             Ok(contact_id_list) => {
@@ -88,14 +88,14 @@ where
                 }
                 Ok(contact_list)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(WechatyError::from(e)),
         }
     }
 
     pub async fn contact_find_all(
         &mut self,
         query: Option<ContactQueryFilter>,
-    ) -> Result<Vec<Contact<T>>, PuppetError> {
+    ) -> Result<Vec<Contact<T>>, WechatyError> {
         debug!("contact_find_all(query = {:?})", query);
         let query = match query {
             Some(query) => query,
@@ -114,11 +114,11 @@ where
                 }
                 Ok(contact_list)
             }
-            Err(e) => Err(e),
+            Err(e) => Err(WechatyError::from(e)),
         }
     }
 
-    pub async fn message_load(&self, message_id: String) -> Result<Message<T>, PuppetError> {
+    pub async fn message_load(&self, message_id: String) -> Result<Message<T>, WechatyError> {
         let payload = {
             match self.messages().get(&message_id) {
                 Some(payload) => Some(payload.clone()),
