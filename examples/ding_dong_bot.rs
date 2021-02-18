@@ -38,8 +38,8 @@ async fn main() {
         println!("User {} has logged out", payload.contact);
     })
     .on_message(
-        async move |payload: MessagePayload<PuppetService>, ctx: WechatyContext<PuppetService>| {
-            let mut message = payload.message;
+        async move |payload: MessagePayload<PuppetService>, ctx| {
+            let message = payload.message;
             println!("Got message: {}", message);
             if message.is_self() {
                 println!("Message discarded because its outgoing");
@@ -49,8 +49,11 @@ async fn main() {
                 if message_type != MessageType::Text || message.text().unwrap() != "ding" {
                     println!("Message discarded because it does not match ding");
                 } else {
-                    message.from().unwrap().send_text("dong".to_owned()).await;
-                    println!("REPLY: dong");
+                    if let Err(e) = message.from().unwrap().send_text("dong".to_owned()).await {
+                        println!("Failed to send message");
+                    } else {
+                        println!("REPLY: dong");
+                    }
                 }
             } else {
                 println!("Message discarded because it is not a text");

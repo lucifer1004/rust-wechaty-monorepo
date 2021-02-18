@@ -137,19 +137,31 @@ where
         }
     }
 
-    pub fn message_find(&self) {}
+    pub fn message_find(&self) {
+        unimplemented!()
+    }
 
-    pub fn message_find_all(&self) {}
+    pub fn message_find_all(&self) {
+        unimplemented!()
+    }
 
     pub async fn room_load(&self, room_id: String) -> Result<Room<T>, WechatyError> {
         unimplemented!()
     }
 
-    pub fn room_create(&self) {}
+    pub fn room_create(&self) {
+        unimplemented!()
+    }
 
-    pub fn room_find(&self) {}
+    pub fn room_find(&self) {
+        unimplemented!()
+    }
 
-    pub fn room_find_all(&self) {}
+    pub fn room_find_all(&self) {
+        unimplemented!()
+    }
 
-    pub fn friendship_add(&self) {}
+    pub fn friendship_add(&self) {
+        unimplemented!()
+    }
 }
