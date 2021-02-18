@@ -3,6 +3,9 @@ name = "wechaty"
 version = "0.1.0-beta.0"
 authors = ["Gabriel Wu <qqbbnease1004@126.com>"]
 edition = "2018"
+license = "Apache-2.0"
+description = "Rust implementation of wechaty"
+keywords = ["chatbot", "wechaty"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -12,12 +15,12 @@ actix-rt = "2.0"
 async-trait = "0.1"
 log = "0.4"
 tokio = "1.2"
-wechaty-puppet = { path = "../wechaty-puppet" }
+wechaty-puppet = "0.1.0-beta.0"
 
 [dev-dependencies]
 env_logger = "0.8"
 qr2term = "0.2"
-wechaty-puppet-service = { path = "../wechaty-puppet-service" }
+wechaty-puppet-service = "0.1.0-beta.0"
 
 [[example]]
 name = "ding-dong-bot"
