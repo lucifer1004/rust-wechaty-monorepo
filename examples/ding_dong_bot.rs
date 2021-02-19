@@ -1,6 +1,7 @@
 #![feature(async_closure)]
 use std::env;
 
+use futures::TryFutureExt;
 use wechaty::{
     wechaty_rt, EventListener, IntoContact, LoginPayload, LogoutPayload, MessagePayload, MessageType, PuppetOptions,
     ScanPayload, Wechaty, WechatyContext,
@@ -23,7 +24,7 @@ async fn main() {
     };
     let mut bot = Wechaty::new(PuppetService::new(options).await.unwrap());
 
-    bot.on_scan(async move |payload: ScanPayload, ctx| {
+    bot.on_scan(async move |payload: ScanPayload, _ctx| {
         if let Some(qrcode) = payload.qrcode {
             println!(
                 "Visit {} to log in",
@@ -37,31 +38,50 @@ async fn main() {
             println!("Contact list: {:?}", ctx.contact_find_all(None).await);
         },
     )
-    .on_logout(async move |payload: LogoutPayload<PuppetService>, ctx| {
+    .on_logout(async move |payload: LogoutPayload<PuppetService>, _ctx| {
         println!("User {} has logged out", payload.contact);
     })
-    .on_message(async move |payload: MessagePayload<PuppetService>, ctx| {
-        let mut message = payload.message;
-        let mentioned = message.mention_list().await;
-        println!("Got message: {}, mentioned: {:?}", message, mentioned);
-        if message.is_self() {
-            println!("Message discarded because its outgoing");
-            return;
-        }
-        if let Some(message_type) = message.message_type() {
-            if message_type != MessageType::Text || message.text().unwrap() != "ding" {
-                println!("Message discarded because it does not match ding");
-            } else {
-                if let Err(e) = message.from().unwrap().send_text("dong".to_owned()).await {
-                    println!("Failed to send message");
+    .on_message(
+        async move |payload: MessagePayload<PuppetService>, ctx: WechatyContext<PuppetService>| {
+            let mut message = payload.message;
+            let mentioned = message.mention_list().await;
+            println!(
+                "Got message: {}, mentioned: {:?}, age: {}",
+                message,
+                mentioned,
+                message.age()
+            );
+            if message.is_self() {
+                println!("Message discarded because it's outgoing");
+                return;
+            }
+            if message.is_in_room() {
+                println!("Message discarded because it's from a room");
+                return;
+            }
+            if let Some(message_type) = message.message_type() {
+                if message_type != MessageType::Text {
+                    println!("Message discarded because it is not a text");
                 } else {
-                    println!("REPLY: dong");
+                    let text = message.text().unwrap_or_default();
+                    if text == "bye" {
+                        println!("Good bye!");
+                        ctx.logout().await;
+                        return;
+                    }
+                    if text == "ding" {
+                        if let Err(e) = message.reply_text("dong".to_owned()).await {
+                            println!("Failed to send message");
+                        } else {
+                            println!("REPLY: dong");
+                        }
+                        return;
+                    }
+                    println!("Message discarded because it does not match any keyword");
                 }
             }
-        } else {
-            println!("Message discarded because it is not a text");
-        }
-    })
+        },
+    )
     .start()
     .await;
 }

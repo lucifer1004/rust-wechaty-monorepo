@@ -32,7 +32,7 @@ where
     }
 
     pub async fn set_avatar(&mut self, file: FileBox) -> Result<(), WechatyError> {
-        debug!("contact_self.set_avatar(file = {})", file);
+        debug!("Contact_self.set_avatar(file = {})", file);
 
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)
@@ -55,7 +55,7 @@ where
     }
 
     pub async fn set_name(&mut self, name: String) -> Result<(), WechatyError> {
-        debug!("contact_self.set_name(name = {})", name);
+        debug!("Contact_self.set_name(name = {})", name);
 
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)
@@ -78,7 +78,7 @@ where
     }
 
     pub async fn set_signature(&mut self, signature: String) -> Result<(), WechatyError> {
-        debug!("contact_self.set_signature(signature = {})", signature);
+        debug!("Contact_self.set_signature(signature = {})", signature);
 
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)
@@ -101,7 +101,7 @@ where
     }
 
     pub async fn qrcode(&self) -> Result<String, WechatyError> {
-        debug!("contact_self.qrcode()");
+        debug!("Contact_self.qrcode()");
 
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)

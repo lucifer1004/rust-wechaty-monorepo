@@ -63,7 +63,7 @@ where
         self.id_ = None;
     }
 
-    fn logged_in(&self) -> bool {
+    pub(crate) fn is_logged_in(&self) -> bool {
         self.id_.is_some()
     }
 
@@ -74,7 +74,7 @@ where
     pub(crate) async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, WechatyError> {
         debug!("contact_load(query = {})", contact_id);
 
-        if !self.logged_in() {
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
 
@@ -120,7 +120,7 @@ where
 
     /// Find the first contact that matches the query
     pub async fn contact_find(&self, query: ContactQueryFilter) -> Result<Option<Contact<T>>, WechatyError> {
-        debug!("contact_find(query_str = {:?})", query_str);
+        debug!("contact_find(query = {:?})", query);
         match self.contact_find_all(Some(query)).await {
             Ok(contact_list) => {
                 if contact_list.is_empty() {
@@ -136,7 +136,7 @@ where
     /// Find the first contact that matches the query string
     pub async fn contact_find_by_string(&self, query_str: String) -> Result<Option<Contact<T>>, WechatyError> {
         debug!("contact_find_by_string(query_str = {:?})", query_str);
-        if !self.logged_in() {
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
         match self.contact_find_all_by_string(query_str).await {
@@ -154,7 +154,7 @@ where
     /// Find all contacts that match the query
     pub async fn contact_find_all(&self, query: Option<ContactQueryFilter>) -> Result<Vec<Contact<T>>, WechatyError> {
         debug!("contact_find_all(query = {:?})", query);
-        if !self.logged_in() {
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
         let query = match query {
@@ -170,7 +170,7 @@ where
     /// Find all contacts that match the query string
     pub async fn contact_find_all_by_string(&self, query_str: String) -> Result<Vec<Contact<T>>, WechatyError> {
         debug!("contact_find_all_by_string(query_str = {:?})", query_str);
-        if !self.logged_in() {
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
         match self.puppet().contact_search_by_string(query_str, None).await {
@@ -185,7 +185,7 @@ where
     /// try to fetch from the puppet instead.
     pub(crate) async fn message_load(&self, message_id: String) -> Result<Message<T>, WechatyError> {
         debug!("message_load(query = {})", message_id);
-        if !self.logged_in() {
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
         let payload = {
@@ -206,10 +206,25 @@ where
         }
     }
 
+    /// Batch load messages with a default batch size of 16.
+    pub(crate) async fn message_load_batch(&self, message_id_list: Vec<String>) -> Vec<Message<T>> {
+        debug!("message_load_batch(message_id_list = {:?})", message_id_list);
+        let mut message_list = vec![];
+        let mut stream = tokio_stream::iter(message_id_list)
+            .map(|message_id| self.message_load(message_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(message) = result {
+                message_list.push(message);
+            }
+        }
+        message_list
+    }
+
     /// Find the first message that matches the query
     pub async fn message_find(&self, query: MessageQueryFilter) -> Result<Option<Message<T>>, WechatyError> {
-        debug!("message_find_by_string(query_str = {:?})", query_str);
-        if !self.logged_in() {
+        debug!("message_find(query = {:?})", query);
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
         match self.message_find_all(query).await {
@@ -227,7 +242,7 @@ where
     /// Find all messages that match the query
     pub async fn message_find_all(&self, query: MessageQueryFilter) -> Result<Vec<Message<T>>, WechatyError> {
         debug!("message_find_all(query = {:?}", query);
-        if !self.logged_in() {
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
         match self.puppet().message_search(query).await {
@@ -238,7 +253,7 @@ where
 
     pub(crate) async fn room_load(&self, room_id: String) -> Result<Room<T>, WechatyError> {
         debug!("room_load(room_id = {})", room_id);
-        if !self.logged_in() {
+        if !self.is_logged_in() {
             return Err(WechatyError::NotLoggedIn);
         }
         let payload = {
@@ -273,5 +288,12 @@ where
 
     pub async fn friendship_add(&self) {
         unimplemented!()
+    }
+
+    pub async fn logout(&self) -> Result<(), WechatyError> {
+        match self.puppet().logout().await {
+            Ok(_) => Ok(()),
+            Err(e) => Err(WechatyError::from(e)),
+        }
     }
 }

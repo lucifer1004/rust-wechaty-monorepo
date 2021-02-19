@@ -11,7 +11,7 @@ keywords = ["chatbot", "wechaty"]
 
 [dependencies]
 actix = "0.11.0-beta.2"
-actix-rt = "2"
+actix-rt = "2.0"
 async-trait = "0.1"
 log = "0.4"
 num-traits = "0.2"

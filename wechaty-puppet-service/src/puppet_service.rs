@@ -43,7 +43,7 @@ impl PuppetService {
                 let response = client.event(EventRequest {}).await;
                 match response {
                     Ok(response) => {
-                        info!("Subscribed event stream");
+                        info!("Subscribed to event stream");
                         let addr = PuppetServiceInner::new().start();
                         let puppet_service = Self {
                             client_: client,
@@ -55,10 +55,16 @@ impl PuppetService {
                         addr.do_send(PuppetServiceInternalMessage::SetupStream(response.into_inner()));
                         Ok(puppet)
                     }
-                    Err(e) => panic!("Failed to establish event stream, {}", e),
+                    Err(e) => Err(PuppetError::Network(format!(
+                        "Failed to establish event stream, reason: {}",
+                        e
+                    ))),
                 }
             }
-            Err(e) => panic!("Failed to establish RPC connection, {}", e),
+            Err(e) => Err(PuppetError::Network(format!(
+                "Failed to establish RPC connection, reason: {}",
+                e
+            ))),
         }
     }
 
@@ -74,7 +80,7 @@ enum PuppetServiceInternalMessage {
     SetupStream(Streaming<EventResponse>),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct PuppetServiceInner {
     callback_addr: Option<Recipient<PuppetEvent>>,
 }
@@ -1173,6 +1179,46 @@ impl PuppetImpl for PuppetService {
                 "Failed to get raw payload for member {} of room {}",
                 contact_id, room_id
             ))),
+        }
+    }
+
+    async fn start(&self) -> Result<(), PuppetError> {
+        debug!("start()");
+        match self.client().start(StartRequest {}).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PuppetError::Network(format!("Failed to start puppet"))),
+        }
+    }
+
+    async fn stop(&self) -> Result<(), PuppetError> {
+        debug!("stop()");
+        match self.client().stop(StopRequest {}).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PuppetError::Network(format!("Failed to stop puppet"))),
+        }
+    }
+
+    async fn ding(&self, data: String) -> Result<(), PuppetError> {
+        debug!("ding(data = {})", data);
+        match self.client().ding(DingRequest { data }).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PuppetError::Network(format!("Failed to ding"))),
+        }
+    }
+
+    async fn version(&self) -> Result<String, PuppetError> {
+        debug!("version()");
+        match self.client().version(VersionRequest {}).await {
+            Ok(response) => Ok(response.into_inner().version),
+            Err(_) => Err(PuppetError::Network(format!("Failed to get puppet version"))),
+        }
+    }
+
+    async fn logout(&self) -> Result<(), PuppetError> {
+        debug!("logout()");
+        match self.client().logout(LogoutRequest {}).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(PuppetError::Network(format!("Failed to logout"))),
         }
     }
 }

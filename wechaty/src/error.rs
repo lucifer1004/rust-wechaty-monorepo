@@ -5,6 +5,7 @@ use wechaty_puppet::PuppetError;
 pub enum WechatyError {
     Puppet(PuppetError),
     NotLoggedIn,
+    NoPayload,
 }
 
 impl fmt::Debug for WechatyError {
@@ -18,6 +19,7 @@ impl fmt::Display for WechatyError {
         match self {
             WechatyError::Puppet(e) => write!(fmt, "Puppet error: {}", e),
             WechatyError::NotLoggedIn => write!(fmt, "User is not logged in"),
+            WechatyError::NoPayload => write!(fmt, "Operation cannot be done because the current entity does not have payload due to an unknown previous issue"),
         }
     }
 }

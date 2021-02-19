@@ -27,36 +27,8 @@ where
         }
     }
 
-    pub fn id(&self) -> String {
-        trace!("room.id(id = {})", self.id_);
-        self.id_.clone()
-    }
-
-    fn ctx(&self) -> WechatyContext<T> {
-        trace!("room.ctx(id = {})", self.id_);
-        self.ctx_.clone()
-    }
-
-    fn payload(&self) -> Option<RoomPayload> {
-        trace!("room.payload(id = {})", self.id_);
-        self.payload_.clone()
-    }
-
-    fn set_payload(&mut self, payload: Option<RoomPayload>) {
-        debug!("room.set_payload(id = {}, payload = {:?})", self.id_, payload);
-        self.payload_ = payload;
-    }
-
-    fn is_ready(&self) -> bool {
-        trace!("room.is_ready(id = {})", self.id_);
-        match self.payload_ {
-            None => false,
-            Some(_) => true,
-        }
-    }
-
     pub(crate) async fn ready(&mut self, force_sync: bool) -> Result<(), WechatyError> {
-        debug!("room.ready(id = {})", self.id_);
+        debug!("Room.ready(id = {})", self.id_);
         if !force_sync && self.is_ready() {
             Ok(())
         } else {
@@ -88,12 +60,17 @@ where
     }
 
     pub(crate) async fn sync(&mut self) -> Result<(), WechatyError> {
-        debug!("room.sync(id = {})", self.id());
+        debug!("Room.sync(id = {})", self.id_);
         self.ready(true).await
     }
 
-    pub async fn member_find_all() -> Result<Vec<Contact<T>>, WechatyError> {
-        unimplemented!()
+    pub async fn member_find_all(&self) -> Result<Vec<Contact<T>>, WechatyError> {
+        debug!("Room.member_find_all(id = {})", self.id_);
+        let ctx = self.ctx();
+        match ctx.puppet().room_member_list(self.id()).await {
+            Ok(member_id_list) => Ok(ctx.contact_load_batch(member_id_list).await),
+            Err(e) => Err(WechatyError::from(e)),
+        }
     }
 }
 

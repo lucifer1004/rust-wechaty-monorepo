@@ -34,17 +34,17 @@ where
     T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     fn id(&self) -> String {
-        trace!("contact.id(id = {})", self.id_);
+        trace!("Contact.id(id = {})", self.id_);
         self.id_.clone()
     }
 
     fn ctx(&self) -> WechatyContext<T> {
-        trace!("contact.ctx(id = {})", self.id_);
+        trace!("Contact.ctx(id = {})", self.id_);
         self.ctx_.clone()
     }
 
     fn identity(&self) -> String {
-        trace!("contact.identity(id = {})", self.id_);
+        trace!("Contact.identity(id = {})", self.id_);
         match self.payload() {
             Some(payload) => {
                 if !payload.alias.is_empty() {
@@ -62,12 +62,12 @@ where
     }
 
     fn payload(&self) -> Option<ContactPayload> {
-        trace!("contact.payload(id = {})", self.id_);
+        trace!("Contact.payload(id = {})", self.id_);
         self.payload_.clone()
     }
 
     fn set_payload(&mut self, payload: Option<ContactPayload>) {
-        debug!("contact.set_payload(id = {}, payload = {:?})", self.id_, payload);
+        debug!("Contact.set_payload(id = {}, payload = {:?})", self.id_, payload);
         self.payload_ = payload;
     }
 }

@@ -1329,6 +1329,26 @@ where
     ) -> Result<RoomMemberPayload, PuppetError> {
         self.puppet_impl.room_member_raw_payload(room_id, contact_id).await
     }
+
+    async fn start(&self) -> Result<(), PuppetError> {
+        self.puppet_impl.start().await
+    }
+
+    async fn stop(&self) -> Result<(), PuppetError> {
+        self.puppet_impl.stop().await
+    }
+
+    async fn ding(&self, data: String) -> Result<(), PuppetError> {
+        self.puppet_impl.ding(data).await
+    }
+
+    async fn version(&self) -> Result<String, PuppetError> {
+        self.puppet_impl.version().await
+    }
+
+    async fn logout(&self) -> Result<(), PuppetError> {
+        self.puppet_impl.logout().await
+    }
 }
 
 #[async_trait]
@@ -1418,4 +1438,10 @@ pub trait PuppetImpl {
         room_id: String,
         contact_id: String,
     ) -> Result<RoomMemberPayload, PuppetError>;
+
+    async fn start(&self) -> Result<(), PuppetError>;
+    async fn stop(&self) -> Result<(), PuppetError>;
+    async fn ding(&self, data: String) -> Result<(), PuppetError>;
+    async fn version(&self) -> Result<String, PuppetError>;
+    async fn logout(&self) -> Result<(), PuppetError>;
 }
