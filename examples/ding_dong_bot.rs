@@ -1,7 +1,6 @@
 #![feature(async_closure)]
 use std::env;
 
-use futures::TryFutureExt;
 use wechaty::{
     wechaty_rt, EventListener, IntoContact, LoginPayload, LogoutPayload, MessagePayload, MessageType, PuppetOptions,
     ScanPayload, Wechaty, WechatyContext,

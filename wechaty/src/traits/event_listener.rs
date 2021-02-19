@@ -206,7 +206,10 @@ where
                 AtomicResponse::new(Box::pin(async {}.into_actor(self).then(move |_, this, _| {
                     EventListenerInner::<T>::trigger_handlers(
                         ctx,
-                        ScanPayload::new(payload.qrcode, payload.status),
+                        ScanPayload {
+                            qrcode: payload.qrcode,
+                            status: payload.status,
+                        },
                         this.scan_handlers.clone(),
                     )
                     .into_actor(this)
