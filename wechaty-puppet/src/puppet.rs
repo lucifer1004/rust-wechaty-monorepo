@@ -8,18 +8,11 @@ use futures::StreamExt;
 use log::{debug, error, info};
 use lru::LruCache;
 
-use crate::FriendshipSearchQueryFilter;
-use crate::ImageType;
-use crate::MiniProgramPayload;
-use crate::PayloadType;
-use crate::PuppetEvent;
-use crate::RoomInvitationPayload;
-use crate::UrlLinkPayload;
-use crate::{ContactGender, ContactType, FriendshipPayload};
-use crate::{ContactPayload, ContactQueryFilter};
-use crate::{MessagePayload, MessageQueryFilter, MessageType};
-use crate::{PuppetError, RoomMemberQueryFilter};
-use crate::{RoomMemberPayload, RoomPayload, RoomQueryFilter};
+use crate::{
+    ContactPayload, ContactQueryFilter, FriendshipPayload, FriendshipSearchQueryFilter, ImageType, MessagePayload,
+    MessageQueryFilter, MessageType, MiniProgramPayload, PayloadType, PuppetError, PuppetEvent, RoomInvitationPayload,
+    RoomMemberPayload, RoomMemberQueryFilter, RoomPayload, RoomQueryFilter, UrlLinkPayload,
+};
 
 const DEFAULT_CONTACT_CACHE_CAP: usize = 3000;
 const DEFAULT_FRIENDSHIP_CACHE_CAP: usize = 300;
@@ -351,12 +344,14 @@ where
 
     /// Batch load contacts with a default batch size of 16.
     ///
+    /// A key point here is that the method called in stream::iter(...).map() cannot hold &mut self.
+    ///
     /// Reference: [Batch execution of futures in the tokio runtime](https://users.rust-lang.org/t/batch-execution-of-futures-in-the-tokio-runtime-or-max-number-of-active-futures-at-a-time/47659).
     ///
     /// Note the API change: `tokio::stream::iter` is now temporarily `tokio_stream::iter`, according to
     /// [tokio's tutorial](https://tokio.rs/tokio/tutorial/streams), it will be moved back to the `tokio`
     /// crate when the `Stream` trait is stable.
-    async fn contact_payload_batch(&mut self, contact_id_list: Vec<String>) -> Vec<ContactPayload> {
+    async fn contact_payload_batch(&self, contact_id_list: Vec<String>) -> Vec<ContactPayload> {
         debug!("contact_payload_batch(contact_id_list = {:?})", contact_id_list);
         let mut contact_list = vec![];
         let mut stream = tokio_stream::iter(contact_id_list)
@@ -439,7 +434,7 @@ where
         };
         debug!("contact_search(search_id_list.len() = {})", contact_id_list.len());
 
-        let filter = self.contact_query_filter_factory(query);
+        let filter = Puppet::<T>::contact_query_filter_factory(query);
 
         Ok(self
             .contact_payload_batch(contact_id_list)
@@ -455,7 +450,7 @@ where
             .collect::<Vec<String>>())
     }
 
-    fn contact_query_filter_factory(&mut self, query: ContactQueryFilter) -> impl Fn(ContactPayload) -> bool {
+    fn contact_query_filter_factory(query: ContactQueryFilter) -> impl Fn(ContactPayload) -> bool {
         debug!("contact_query_filter_factory(query = {:?})", query);
         move |payload| -> bool {
             let query = query.clone();
@@ -497,7 +492,8 @@ where
         Message
     */
 
-    pub async fn message_payload(&mut self, message_id: String) -> Result<MessagePayload, PuppetError> {
+    /// Load a message by id.
+    pub async fn message_payload(&self, message_id: String) -> Result<MessagePayload, PuppetError> {
         debug!("message_payload(message_id = {})", message_id);
         let cache = &*self.cache_message_payload;
         if cache.lock().unwrap().contains(&message_id) {
@@ -513,6 +509,22 @@ where
         }
     }
 
+    /// Batch load messages with a default batch size of 16.
+    async fn message_payload_batch(&mut self, message_id_list: Vec<String>) -> Vec<MessagePayload> {
+        debug!("message_payload_batch(message_id_list = {:?})", message_id_list);
+        let mut message_list = vec![];
+        let mut stream = tokio_stream::iter(message_id_list)
+            .map(|message_id| self.message_payload(message_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(message) = result {
+                message_list.push(message);
+            }
+        }
+        message_list
+    }
+
+    /// Get all cached messages.
     pub fn message_list(&self) -> Vec<String> {
         debug!("message_list()");
         let mut message_id_list = vec![];
@@ -529,7 +541,7 @@ where
         debug!("message_search(message_id_list.len() = {})", message_id_list.len());
 
         let mut filtered_message_id_list = vec![];
-        let filter = self.message_query_filter_factory(query);
+        let filter = Puppet::<T>::message_query_filter_factory(query);
         for message_id in message_id_list {
             if let Ok(payload) = self.message_payload(message_id.clone()).await {
                 if filter(payload) {
@@ -543,7 +555,7 @@ where
         Ok(filtered_message_id_list)
     }
 
-    fn message_query_filter_factory(&mut self, query: MessageQueryFilter) -> impl Fn(MessagePayload) -> bool {
+    fn message_query_filter_factory(query: MessageQueryFilter) -> impl Fn(MessagePayload) -> bool {
         debug!("message_query_filter_factory(query = {:?})", query);
         move |payload| -> bool {
             let query = query.clone();
@@ -665,8 +677,8 @@ where
         }
     }
 
-    /// Friendship payload getter.
-    pub async fn friendship_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
+    /// Load a friendship by id.
+    pub async fn friendship_payload(&self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
         debug!("friendship_payload(friendship_id = {})", friendship_id);
         let cache = &*self.cache_friendship_payload;
         if cache.lock().unwrap().contains(&friendship_id) {
@@ -680,6 +692,24 @@ where
                 Err(e) => Err(e),
             }
         }
+    }
+
+    /// Batch load friendships with a default batch size of 16.
+    async fn friendship_payload_batch(&mut self, friendship_id_list: Vec<String>) -> Vec<FriendshipPayload> {
+        debug!(
+            "friendship_payload_batch(friendship_id_list = {:?})",
+            friendship_id_list
+        );
+        let mut friendship_list = vec![];
+        let mut stream = tokio_stream::iter(friendship_id_list)
+            .map(|friendship_id| self.friendship_payload(friendship_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(friendship) = result {
+                friendship_list.push(friendship);
+            }
+        }
+        friendship_list
     }
 
     /// Friendship payload setter.
@@ -703,9 +733,9 @@ where
        Room Invitation
     */
 
-    /// Room invitation payload getter.
+    /// Load a room invitation by id.
     pub async fn room_invitation_payload(
-        &mut self,
+        &self,
         room_invitation_id: String,
     ) -> Result<RoomInvitationPayload, PuppetError> {
         debug!("room_invitation_payload(room_invitation_id = {})", room_invitation_id);
@@ -725,6 +755,27 @@ where
                 Err(e) => Err(e),
             }
         }
+    }
+
+    /// Batch load room invitations with a default batch size of 16.
+    async fn room_invitation_payload_batch(
+        &mut self,
+        room_invitation_id_list: Vec<String>,
+    ) -> Vec<RoomInvitationPayload> {
+        debug!(
+            "room_invitation_payload_batch(room_invitation_id_list = {:?})",
+            room_invitation_id_list
+        );
+        let mut room_invitation_list = vec![];
+        let mut stream = tokio_stream::iter(room_invitation_id_list)
+            .map(|room_invitation_id| self.room_invitation_payload(room_invitation_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(room_invitation) = result {
+                room_invitation_list.push(room_invitation);
+            }
+        }
+        room_invitation_list
     }
 
     /// Room invitation payload setter.
@@ -748,7 +799,8 @@ where
        Room
     */
 
-    pub async fn room_payload(&mut self, room_id: String) -> Result<RoomPayload, PuppetError> {
+    /// Load a room by id.
+    pub async fn room_payload(&self, room_id: String) -> Result<RoomPayload, PuppetError> {
         debug!("room_payload(room_id = {})", room_id);
         let cache = &*self.cache_room_payload;
         if cache.lock().unwrap().contains(&room_id) {
@@ -764,27 +816,105 @@ where
         }
     }
 
+    /// Batch load rooms with a default batch size of 16.
+    async fn room_payload_batch(&mut self, room_id_list: Vec<String>) -> Vec<RoomPayload> {
+        debug!("room_payload_batch(room_id_list = {:?})", room_id_list);
+        let mut room_list = vec![];
+        let mut stream = tokio_stream::iter(room_id_list)
+            .map(|room_id| self.room_payload(room_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(room) = result {
+                room_list.push(room);
+            }
+        }
+        room_list
+    }
+
+    /// Helper function to generate room member cache key.
     fn cache_key_room_member(room_id: String, contact_id: String) -> String {
         format!("{}@@@{}", contact_id, room_id)
     }
 
+    /// Search room members by string.
     pub async fn room_member_search_by_string(
         &mut self,
         room_id: String,
         query_str: String,
     ) -> Result<Vec<String>, PuppetError> {
-        unimplemented!()
+        debug!("room_member_search_by_string(query_str = {})", query_str);
+        let search_by_id = self
+            .room_member_search(
+                room_id.clone(),
+                RoomMemberQueryFilter {
+                    name: Some(query_str.clone()),
+                    room_alias: None,
+                    name_regex: None,
+                    room_alias_regex: None
+                },
+            )
+            .await;
+        let search_by_alias = self
+            .room_member_search(
+                room_id,
+                RoomMemberQueryFilter {
+                    name: None,
+                    room_alias: Some(query_str),
+                    name_regex: None,
+                    room_alias_regex: None
+                },
+            )
+            .await;
+        let mut filtered_room_member_id_list = vec![];
+        if let Ok(room_member_id_list) = search_by_id {
+            for room_member_id in room_member_id_list {
+                filtered_room_member_id_list.push(room_member_id);
+            }
+        }
+        if let Ok(room_member_id_list) = search_by_alias {
+            for room_member_id in room_member_id_list {
+                filtered_room_member_id_list.push(room_member_id);
+            }
+        }
+        Ok(filtered_room_member_id_list
+            .into_iter()
+            .collect::<HashSet<String>>()
+            .into_iter()
+            .collect::<Vec<String>>())
     }
 
+    /// Search room members.
+    /// 
+    /// Currently, searching by contact alias is not supported.
     pub async fn room_member_search(
         &mut self,
         room_id: String,
         query: RoomMemberQueryFilter,
     ) -> Result<Vec<String>, PuppetError> {
-        unimplemented!()
+        debug!("room_member_search(query = {:?})", query);
+        let member_id_list = match self.puppet_impl.room_member_list(room_id.clone()).await {
+                Ok(member_id_list) => member_id_list,
+                Err(e) => return Err(e),
+        };
+        debug!("room_member_search(member_id_list.len() = {})", member_id_list.len());
+
+        let filter = Puppet::<T>::room_member_query_filter_factory(query);
+
+        Ok(self
+            .room_member_payload_batch(room_id, member_id_list)
+            .await
+            .into_iter()
+            .filter_map(|payload| {
+                if filter(payload.clone()) {
+                    Some(payload.id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>())
     }
 
-    fn room_member_query_filter_factory(&mut self, query: RoomMemberQueryFilter) -> impl Fn(RoomMemberPayload) -> bool {
+    fn room_member_query_filter_factory(query: RoomMemberQueryFilter) -> impl Fn(RoomMemberPayload) -> bool {
         debug!("room_member_query_filter_factory(query = {:?})", query);
         move |payload| -> bool {
             let query = query.clone();
@@ -812,8 +942,27 @@ where
         }
     }
 
+    /// Batch load room members with a default batch size of 16.
+    async fn room_member_payload_batch(&self, room_id: String, member_id_list: Vec<String>) -> Vec<RoomMemberPayload> {
+        debug!(
+            "room_member_payload_batch(room_id = {}, member_id_list = {:?})",
+            room_id, member_id_list
+        );
+        let mut member_list = vec![];
+        let mut stream = tokio_stream::iter(member_id_list)
+            .map(|member_id| self.room_member_payload(room_id.clone(), member_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(member) = result {
+                member_list.push(member);
+            }
+        }
+        member_list
+    }
+
+    /// Load a room member by room id and payload id.
     pub async fn room_member_payload(
-        &mut self,
+        &self,
         room_id: String,
         member_id: String,
     ) -> Result<RoomMemberPayload, PuppetError> {
@@ -845,22 +994,23 @@ where
         };
         debug!("room_search(room_id_list.len() = {})", room_id_list.len());
 
-        let mut filtered_room_id_list = vec![];
-        let filter = self.room_query_filter_factory(query);
-        for room_id in room_id_list {
-            if let Ok(payload) = self.room_payload(room_id.clone()).await {
-                if filter(payload) {
-                    filtered_room_id_list.push(room_id.clone());
-                }
-            } else {
-                error!("Failed to get room payload for {}", room_id);
-            }
-        }
+        let filter = Puppet::<T>::room_query_filter_factory(query);
 
-        Ok(filtered_room_id_list)
+        Ok(self
+            .room_payload_batch(room_id_list)
+            .await
+            .into_iter()
+            .filter_map(|payload| {
+                if filter(payload.clone()) {
+                    Some(payload.id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>())
     }
 
-    fn room_query_filter_factory(&mut self, query: RoomQueryFilter) -> impl Fn(RoomPayload) -> bool {
+    fn room_query_filter_factory(query: RoomQueryFilter) -> impl Fn(RoomPayload) -> bool {
         debug!("room_query_filter_factory(query = {:?})", query);
         move |payload| -> bool {
             if let Some(id) = query.clone().id {
