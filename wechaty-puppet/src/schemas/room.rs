@@ -2,9 +2,10 @@ use regex::Regex;
 
 #[derive(Debug, Clone)]
 pub struct RoomMemberQueryFilter {
-    name: Option<String>,
-    room_alias: Option<String>,
-    contact_alias: Option<String>,
+    pub name: Option<String>,
+    pub room_alias: Option<String>,
+    pub name_regex: Option<Regex>,
+    pub room_alias_regex: Option<Regex>,
 }
 
 #[derive(Debug, Clone)]

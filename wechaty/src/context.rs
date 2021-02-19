@@ -100,7 +100,7 @@ where
     ///
     /// Reference: [Batch execution of futures in the tokio runtime](https://users.rust-lang.org/t/batch-execution-of-futures-in-the-tokio-runtime-or-max-number-of-active-futures-at-a-time/47659).
     ///
-    /// Note the API changes: `tokio::stream::iter` is now temporarily `tokio_stream::iter`, according to
+    /// Note the API change: `tokio::stream::iter` is now temporarily `tokio_stream::iter`, according to
     /// [tokio's tutorial](https://tokio.rs/tokio/tutorial/streams), it will be moved back to the `tokio`
     /// crate when the `Stream` trait is stable.
     pub(crate) async fn contact_load_batch(&mut self, contact_id_list: Vec<String>) -> Vec<Contact<T>> {
@@ -184,7 +184,7 @@ where
             Some(payload) => Ok(Room::new(room_id.clone(), self.clone(), Some(payload))),
             None => {
                 let mut room = Room::new(room_id.clone(), self.clone(), None);
-                if let Err(e) = room.ready().await {
+                if let Err(e) = room.sync().await {
                     return Err(e);
                 }
                 Ok(room)

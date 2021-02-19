@@ -23,7 +23,7 @@ where
         };
         Self {
             id_: id,
-            ctx,
+            ctx_: ctx,
             payload_: payload,
         }
     }
@@ -40,7 +40,7 @@ where
 
     fn ctx(&self) -> WechatyContext<T> {
         trace!("contact.ctx(id = {})", self.id_);
-        self.ctx.clone()
+        self.ctx_.clone()
     }
 
     fn identity(&self) -> String {

@@ -58,6 +58,6 @@ pub enum FriendshipPayload {
 
 #[derive(Debug, Clone)]
 pub struct FriendshipSearchQueryFilter {
-    phone: Option<String>,
-    weixin: Option<String>,
+    pub phone: Option<String>,
+    pub weixin: Option<String>,
 }

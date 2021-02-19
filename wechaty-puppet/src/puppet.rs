@@ -4,20 +4,22 @@ use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Context, Handler, Message, Recipient};
 use async_trait::async_trait;
+use futures::StreamExt;
 use log::{debug, error, info};
 use lru::LruCache;
 
-use crate::error::PuppetError;
-use crate::events::PuppetEvent;
-use crate::schemas::contact::{ContactPayload, ContactQueryFilter};
-use crate::schemas::friendship::FriendshipPayload;
-use crate::schemas::image::ImageType;
-use crate::schemas::message::{MessagePayload, MessageQueryFilter, MessageType};
-use crate::schemas::mini_program::MiniProgramPayload;
-use crate::schemas::payload::PayloadType;
-use crate::schemas::room::{RoomMemberPayload, RoomPayload, RoomQueryFilter};
-use crate::schemas::room_invitation::RoomInvitationPayload;
-use crate::schemas::url_link::UrlLinkPayload;
+use crate::FriendshipSearchQueryFilter;
+use crate::ImageType;
+use crate::MiniProgramPayload;
+use crate::PayloadType;
+use crate::PuppetEvent;
+use crate::RoomInvitationPayload;
+use crate::UrlLinkPayload;
+use crate::{ContactGender, ContactType, FriendshipPayload};
+use crate::{ContactPayload, ContactQueryFilter};
+use crate::{MessagePayload, MessageQueryFilter, MessageType};
+use crate::{PuppetError, RoomMemberQueryFilter};
+use crate::{RoomMemberPayload, RoomPayload, RoomQueryFilter};
 
 const DEFAULT_CONTACT_CACHE_CAP: usize = 3000;
 const DEFAULT_FRIENDSHIP_CACHE_CAP: usize = 300;
@@ -52,7 +54,7 @@ type LruCachePtr<T> = Arc<Mutex<LruCache<String, T>>>;
 #[derive(Clone)]
 pub struct Puppet<T>
 where
-    T: PuppetImpl + Send,
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     puppet_impl: T,
     addr: Addr<PuppetInner>,
@@ -280,7 +282,7 @@ impl Handler<PuppetEvent> for PuppetInner {
 
 impl<T> Puppet<T>
 where
-    T: PuppetImpl + Send,
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     pub fn new(puppet_impl: T) -> Self {
         let addr = PuppetInner::new().start();
@@ -330,7 +332,8 @@ where
         Contact
     */
 
-    pub async fn contact_payload(&mut self, contact_id: String) -> Result<ContactPayload, PuppetError> {
+    /// Load a contact by id.
+    pub async fn contact_payload(&self, contact_id: String) -> Result<ContactPayload, PuppetError> {
         debug!("contact_payload(contact_id = {})", contact_id);
         let cache = &*self.cache_contact_payload;
         if cache.lock().unwrap().contains(&contact_id) {
@@ -346,6 +349,30 @@ where
         }
     }
 
+    /// Batch load contacts with a default batch size of 16.
+    ///
+    /// Reference: [Batch execution of futures in the tokio runtime](https://users.rust-lang.org/t/batch-execution-of-futures-in-the-tokio-runtime-or-max-number-of-active-futures-at-a-time/47659).
+    ///
+    /// Note the API change: `tokio::stream::iter` is now temporarily `tokio_stream::iter`, according to
+    /// [tokio's tutorial](https://tokio.rs/tokio/tutorial/streams), it will be moved back to the `tokio`
+    /// crate when the `Stream` trait is stable.
+    async fn contact_payload_batch(&mut self, contact_id_list: Vec<String>) -> Vec<ContactPayload> {
+        debug!("contact_payload_batch(contact_id_list = {:?})", contact_id_list);
+        let mut contact_list = vec![];
+        let mut stream = tokio_stream::iter(contact_id_list)
+            .map(|contact_id| self.contact_payload(contact_id))
+            .buffer_unordered(16);
+        while let Some(result) = stream.next().await {
+            if let Ok(contact) = result {
+                contact_list.push(contact);
+            }
+        }
+        contact_list
+    }
+
+    /// Search contacts by string.
+    ///
+    /// Return all contacts that has an alias or name that matches the query string.
     pub async fn contact_search_by_string(
         &mut self,
         query_str: String,
@@ -396,6 +423,7 @@ where
             .collect::<Vec<String>>())
     }
 
+    /// Search contacts by query.
     pub async fn contact_search(
         &mut self,
         query: ContactQueryFilter,
@@ -411,50 +439,52 @@ where
         };
         debug!("contact_search(search_id_list.len() = {})", contact_id_list.len());
 
-        let mut filtered_contact_id_list = vec![];
         let filter = self.contact_query_filter_factory(query);
-        for contact_id in contact_id_list {
-            if let Ok(payload) = self.contact_payload(contact_id.clone()).await {
-                if filter(payload) {
-                    filtered_contact_id_list.push(contact_id.clone());
-                }
-            } else {
-                error!("Failed to get contact payload for {}", contact_id);
-            }
-        }
 
-        Ok(filtered_contact_id_list)
+        Ok(self
+            .contact_payload_batch(contact_id_list)
+            .await
+            .into_iter()
+            .filter_map(|payload| {
+                if filter(payload.clone()) {
+                    Some(payload.id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>())
     }
 
     fn contact_query_filter_factory(&mut self, query: ContactQueryFilter) -> impl Fn(ContactPayload) -> bool {
         debug!("contact_query_filter_factory(query = {:?})", query);
         move |payload| -> bool {
-            if let Some(id) = query.clone().id {
+            let query = query.clone();
+            if let Some(id) = query.id {
                 if payload.id != id {
                     return false;
                 }
             }
-            if let Some(name) = query.clone().name {
+            if let Some(name) = query.name {
                 if payload.name != name {
                     return false;
                 }
             }
-            if let Some(alias) = query.clone().alias {
+            if let Some(alias) = query.alias {
                 if payload.alias != alias {
                     return false;
                 }
             }
-            if let Some(weixin) = query.clone().weixin {
+            if let Some(weixin) = query.weixin {
                 if payload.weixin != weixin {
                     return false;
                 }
             }
-            if let Some(name_regex) = query.clone().name_regex {
+            if let Some(name_regex) = query.name_regex {
                 if !name_regex.is_match(&payload.name) {
                     return false;
                 }
             }
-            if let Some(alias_regex) = query.clone().alias_regex {
+            if let Some(alias_regex) = query.alias_regex {
                 if !alias_regex.is_match(&payload.alias) {
                     return false;
                 }
@@ -516,37 +546,38 @@ where
     fn message_query_filter_factory(&mut self, query: MessageQueryFilter) -> impl Fn(MessagePayload) -> bool {
         debug!("message_query_filter_factory(query = {:?})", query);
         move |payload| -> bool {
-            if let Some(id) = query.clone().id {
+            let query = query.clone();
+            if let Some(id) = query.id {
                 if payload.id != id {
                     return false;
                 }
             }
-            if let Some(message_type) = query.clone().message_type {
+            if let Some(message_type) = query.message_type {
                 if payload.message_type != message_type {
                     return false;
                 }
             }
-            if let Some(from_id) = query.clone().from_id {
+            if let Some(from_id) = query.from_id {
                 if payload.from_id != from_id {
                     return false;
                 }
             }
-            if let Some(to_id) = query.clone().to_id {
+            if let Some(to_id) = query.to_id {
                 if payload.to_id != to_id {
                     return false;
                 }
             }
-            if let Some(room_id) = query.clone().room_id {
+            if let Some(room_id) = query.room_id {
                 if payload.room_id != room_id {
                     return false;
                 }
             }
-            if let Some(text) = query.clone().text {
+            if let Some(text) = query.text {
                 if payload.text != text {
                     return false;
                 }
             }
-            if let Some(text_regex) = query.clone().text_regex {
+            if let Some(text_regex) = query.text_regex {
                 if !text_regex.is_match(&payload.text) {
                     return false;
                 }
@@ -617,6 +648,22 @@ where
     /*
         Friendship
     */
+
+    /// Search friendship.
+    ///
+    /// First search by phone, then search by weixin.
+    pub async fn friendship_search(
+        &mut self,
+        query: FriendshipSearchQueryFilter,
+    ) -> Result<Option<String>, PuppetError> {
+        if let Some(phone) = query.phone {
+            self.friendship_search_phone(phone).await
+        } else if let Some(weixin) = query.weixin {
+            self.friendship_search_weixin(weixin).await
+        } else {
+            Ok(None)
+        }
+    }
 
     /// Friendship payload getter.
     pub async fn friendship_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
@@ -719,6 +766,50 @@ where
 
     fn cache_key_room_member(room_id: String, contact_id: String) -> String {
         format!("{}@@@{}", contact_id, room_id)
+    }
+
+    pub async fn room_member_search_by_string(
+        &mut self,
+        room_id: String,
+        query_str: String,
+    ) -> Result<Vec<String>, PuppetError> {
+        unimplemented!()
+    }
+
+    pub async fn room_member_search(
+        &mut self,
+        room_id: String,
+        query: RoomMemberQueryFilter,
+    ) -> Result<Vec<String>, PuppetError> {
+        unimplemented!()
+    }
+
+    fn room_member_query_filter_factory(&mut self, query: RoomMemberQueryFilter) -> impl Fn(RoomMemberPayload) -> bool {
+        debug!("room_member_query_filter_factory(query = {:?})", query);
+        move |payload| -> bool {
+            let query = query.clone();
+            if let Some(name) = query.name {
+                if payload.name != name {
+                    return false;
+                }
+            }
+            if let Some(room_alias) = query.room_alias {
+                if payload.room_alias != room_alias {
+                    return false;
+                }
+            }
+            if let Some(name_regex) = query.name_regex {
+                if !name_regex.is_match(&payload.name) {
+                    return false;
+                }
+            }
+            if let Some(room_alias_regex) = query.room_alias_regex {
+                if !room_alias_regex.is_match(&payload.room_alias) {
+                    return false;
+                }
+            }
+            true
+        }
     }
 
     pub async fn room_member_payload(
@@ -851,62 +942,62 @@ where
 #[async_trait]
 impl<T> PuppetImpl for Puppet<T>
 where
-    T: PuppetImpl + Send,
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
-    async fn contact_self_name_set(&mut self, name: String) -> Result<(), PuppetError> {
+    async fn contact_self_name_set(&self, name: String) -> Result<(), PuppetError> {
         self.puppet_impl.contact_self_name_set(name).await
     }
 
-    async fn contact_self_qr_code(&mut self) -> Result<String, PuppetError> {
+    async fn contact_self_qr_code(&self) -> Result<String, PuppetError> {
         self.puppet_impl.contact_self_qr_code().await
     }
 
-    async fn contact_self_signature_set(&mut self, signature: String) -> Result<(), PuppetError> {
+    async fn contact_self_signature_set(&self, signature: String) -> Result<(), PuppetError> {
         self.puppet_impl.contact_self_signature_set(signature).await
     }
 
-    async fn tag_contact_add(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn tag_contact_add(&self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.tag_contact_add(tag_id, contact_id).await
     }
 
-    async fn tag_contact_remove(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn tag_contact_remove(&self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.tag_contact_remove(tag_id, contact_id).await
     }
 
-    async fn tag_contact_delete(&mut self, tag_id: String) -> Result<(), PuppetError> {
+    async fn tag_contact_delete(&self, tag_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.tag_contact_delete(tag_id).await
     }
 
-    async fn tag_contact_list(&mut self, contact_id: String) -> Result<Vec<String>, PuppetError> {
+    async fn tag_contact_list(&self, contact_id: String) -> Result<Vec<String>, PuppetError> {
         self.puppet_impl.tag_contact_list(contact_id).await
     }
 
-    async fn tag_list(&mut self) -> Result<Vec<String>, PuppetError> {
+    async fn tag_list(&self) -> Result<Vec<String>, PuppetError> {
         self.puppet_impl.tag_list().await
     }
 
-    async fn contact_alias(&mut self, contact_id: String) -> Result<String, PuppetError> {
+    async fn contact_alias(&self, contact_id: String) -> Result<String, PuppetError> {
         self.puppet_impl.contact_alias(contact_id).await
     }
 
-    async fn contact_alias_set(&mut self, contact_id: String, alias: String) -> Result<(), PuppetError> {
+    async fn contact_alias_set(&self, contact_id: String, alias: String) -> Result<(), PuppetError> {
         self.puppet_impl.contact_alias_set(contact_id, alias).await
     }
 
-    async fn contact_avatar(&mut self, contact_id: String) -> Result<FileBox, PuppetError> {
+    async fn contact_avatar(&self, contact_id: String) -> Result<FileBox, PuppetError> {
         self.puppet_impl.contact_avatar(contact_id).await
     }
 
-    async fn contact_avatar_set(&mut self, contact_id: String, file: FileBox) -> Result<(), PuppetError> {
+    async fn contact_avatar_set(&self, contact_id: String, file: FileBox) -> Result<(), PuppetError> {
         self.puppet_impl.contact_avatar_set(contact_id, file).await
     }
 
-    async fn contact_phone_set(&mut self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError> {
+    async fn contact_phone_set(&self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError> {
         self.puppet_impl.contact_phone_set(contact_id, phone_list).await
     }
 
     async fn contact_corporation_remark_set(
-        &mut self,
+        &self,
         contact_id: String,
         corporation_remark: Option<String>,
     ) -> Result<(), PuppetError> {
@@ -916,59 +1007,55 @@ where
     }
 
     async fn contact_description_set(
-        &mut self,
+        &self,
         contact_id: String,
         description: Option<String>,
     ) -> Result<(), PuppetError> {
         self.puppet_impl.contact_description_set(contact_id, description).await
     }
 
-    async fn contact_list(&mut self) -> Result<Vec<String>, PuppetError> {
+    async fn contact_list(&self) -> Result<Vec<String>, PuppetError> {
         self.puppet_impl.contact_list().await
     }
 
-    async fn contact_raw_payload(&mut self, contact_id: String) -> Result<ContactPayload, PuppetError> {
+    async fn contact_raw_payload(&self, contact_id: String) -> Result<ContactPayload, PuppetError> {
         self.puppet_impl.contact_raw_payload(contact_id).await
     }
 
-    async fn message_contact(&mut self, message_id: String) -> Result<String, PuppetError> {
+    async fn message_contact(&self, message_id: String) -> Result<String, PuppetError> {
         self.puppet_impl.message_contact(message_id).await
     }
 
-    async fn message_file(&mut self, message_id: String) -> Result<FileBox, PuppetError> {
+    async fn message_file(&self, message_id: String) -> Result<FileBox, PuppetError> {
         self.puppet_impl.message_file(message_id).await
     }
 
-    async fn message_image(&mut self, message_id: String, image_type: ImageType) -> Result<FileBox, PuppetError> {
+    async fn message_image(&self, message_id: String, image_type: ImageType) -> Result<FileBox, PuppetError> {
         self.puppet_impl.message_image(message_id, image_type).await
     }
 
-    async fn message_mini_program(&mut self, message_id: String) -> Result<MiniProgramPayload, PuppetError> {
+    async fn message_mini_program(&self, message_id: String) -> Result<MiniProgramPayload, PuppetError> {
         self.puppet_impl.message_mini_program(message_id).await
     }
 
-    async fn message_url(&mut self, message_id: String) -> Result<UrlLinkPayload, PuppetError> {
+    async fn message_url(&self, message_id: String) -> Result<UrlLinkPayload, PuppetError> {
         self.puppet_impl.message_url(message_id).await
     }
 
     async fn message_send_contact(
-        &mut self,
+        &self,
         conversation_id: String,
         contact_id: String,
     ) -> Result<Option<String>, PuppetError> {
         self.puppet_impl.message_send_contact(conversation_id, contact_id).await
     }
 
-    async fn message_send_file(
-        &mut self,
-        conversation_id: String,
-        file: FileBox,
-    ) -> Result<Option<String>, PuppetError> {
+    async fn message_send_file(&self, conversation_id: String, file: FileBox) -> Result<Option<String>, PuppetError> {
         self.puppet_impl.message_send_file(conversation_id, file).await
     }
 
     async fn message_send_mini_program(
-        &mut self,
+        &self,
         conversation_id: String,
         mini_program_payload: MiniProgramPayload,
     ) -> Result<Option<String>, PuppetError> {
@@ -978,7 +1065,7 @@ where
     }
 
     async fn message_send_text(
-        &mut self,
+        &self,
         conversation_id: String,
         text: String,
         mention_id_list: Vec<String>,
@@ -989,7 +1076,7 @@ where
     }
 
     async fn message_send_url(
-        &mut self,
+        &self,
         conversation_id: String,
         url_link_payload: UrlLinkPayload,
     ) -> Result<Option<String>, PuppetError> {
@@ -998,99 +1085,95 @@ where
             .await
     }
 
-    async fn message_raw_payload(&mut self, message_id: String) -> Result<MessagePayload, PuppetError> {
+    async fn message_raw_payload(&self, message_id: String) -> Result<MessagePayload, PuppetError> {
         self.puppet_impl.message_raw_payload(message_id).await
     }
 
-    async fn friendship_accept(&mut self, friendship_id: String) -> Result<(), PuppetError> {
+    async fn friendship_accept(&self, friendship_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.friendship_accept(friendship_id).await
     }
 
-    async fn friendship_add(&mut self, contact_id: String, hello: Option<String>) -> Result<(), PuppetError> {
+    async fn friendship_add(&self, contact_id: String, hello: Option<String>) -> Result<(), PuppetError> {
         self.puppet_impl.friendship_add(contact_id, hello).await
     }
 
-    async fn friendship_search_phone(&mut self, phone: String) -> Result<Option<String>, PuppetError> {
+    async fn friendship_search_phone(&self, phone: String) -> Result<Option<String>, PuppetError> {
         self.puppet_impl.friendship_search_phone(phone).await
     }
 
-    async fn friendship_search_weixin(&mut self, weixin: String) -> Result<Option<String>, PuppetError> {
+    async fn friendship_search_weixin(&self, weixin: String) -> Result<Option<String>, PuppetError> {
         self.puppet_impl.friendship_search_weixin(weixin).await
     }
 
-    async fn friendship_raw_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
+    async fn friendship_raw_payload(&self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
         self.puppet_impl.friendship_raw_payload(friendship_id).await
     }
 
-    async fn room_invitation_accept(&mut self, room_invitation_id: String) -> Result<(), PuppetError> {
+    async fn room_invitation_accept(&self, room_invitation_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.room_invitation_accept(room_invitation_id).await
     }
 
     async fn room_invitation_raw_payload(
-        &mut self,
+        &self,
         room_invitation_id: String,
     ) -> Result<RoomInvitationPayload, PuppetError> {
         self.puppet_impl.room_invitation_raw_payload(room_invitation_id).await
     }
 
-    async fn room_add(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn room_add(&self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.room_add(room_id, contact_id).await
     }
 
-    async fn room_avatar(&mut self, room_id: String) -> Result<FileBox, PuppetError> {
+    async fn room_avatar(&self, room_id: String) -> Result<FileBox, PuppetError> {
         self.puppet_impl.room_avatar(room_id).await
     }
 
-    async fn room_create(
-        &mut self,
-        contact_id_list: Vec<String>,
-        topic: Option<String>,
-    ) -> Result<String, PuppetError> {
+    async fn room_create(&self, contact_id_list: Vec<String>, topic: Option<String>) -> Result<String, PuppetError> {
         self.puppet_impl.room_create(contact_id_list, topic).await
     }
 
-    async fn room_del(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn room_del(&self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.room_del(room_id, contact_id).await
     }
 
-    async fn room_qr_code(&mut self, room_id: String) -> Result<String, PuppetError> {
+    async fn room_qr_code(&self, room_id: String) -> Result<String, PuppetError> {
         self.puppet_impl.room_qr_code(room_id).await
     }
 
-    async fn room_quit(&mut self, room_id: String) -> Result<(), PuppetError> {
+    async fn room_quit(&self, room_id: String) -> Result<(), PuppetError> {
         self.puppet_impl.room_quit(room_id).await
     }
 
-    async fn room_topic(&mut self, room_id: String) -> Result<String, PuppetError> {
+    async fn room_topic(&self, room_id: String) -> Result<String, PuppetError> {
         self.puppet_impl.room_topic(room_id).await
     }
 
-    async fn room_topic_set(&mut self, room_id: String, topic: String) -> Result<(), PuppetError> {
+    async fn room_topic_set(&self, room_id: String, topic: String) -> Result<(), PuppetError> {
         self.puppet_impl.room_topic_set(room_id, topic).await
     }
 
-    async fn room_list(&mut self) -> Result<Vec<String>, PuppetError> {
+    async fn room_list(&self) -> Result<Vec<String>, PuppetError> {
         self.puppet_impl.room_list().await
     }
 
-    async fn room_raw_payload(&mut self, room_id: String) -> Result<RoomPayload, PuppetError> {
+    async fn room_raw_payload(&self, room_id: String) -> Result<RoomPayload, PuppetError> {
         self.puppet_impl.room_raw_payload(room_id).await
     }
 
-    async fn room_announce(&mut self, room_id: String) -> Result<String, PuppetError> {
+    async fn room_announce(&self, room_id: String) -> Result<String, PuppetError> {
         self.puppet_impl.room_announce(room_id).await
     }
 
-    async fn room_announce_set(&mut self, room_id: String, text: String) -> Result<(), PuppetError> {
+    async fn room_announce_set(&self, room_id: String, text: String) -> Result<(), PuppetError> {
         self.puppet_impl.room_announce_set(room_id, text).await
     }
 
-    async fn room_member_list(&mut self, room_id: String) -> Result<Vec<String>, PuppetError> {
+    async fn room_member_list(&self, room_id: String) -> Result<Vec<String>, PuppetError> {
         self.puppet_impl.room_member_list(room_id).await
     }
 
     async fn room_member_raw_payload(
-        &mut self,
+        &self,
         room_id: String,
         contact_id: String,
     ) -> Result<RoomMemberPayload, PuppetError> {
@@ -1100,96 +1183,88 @@ where
 
 #[async_trait]
 pub trait PuppetImpl {
-    async fn contact_self_name_set(&mut self, name: String) -> Result<(), PuppetError>;
-    async fn contact_self_qr_code(&mut self) -> Result<String, PuppetError>;
-    async fn contact_self_signature_set(&mut self, signature: String) -> Result<(), PuppetError>;
+    async fn contact_self_name_set(&self, name: String) -> Result<(), PuppetError>;
+    async fn contact_self_qr_code(&self) -> Result<String, PuppetError>;
+    async fn contact_self_signature_set(&self, signature: String) -> Result<(), PuppetError>;
 
-    async fn tag_contact_add(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError>;
-    async fn tag_contact_remove(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError>;
-    async fn tag_contact_delete(&mut self, tag_id: String) -> Result<(), PuppetError>;
-    async fn tag_contact_list(&mut self, contact_id: String) -> Result<Vec<String>, PuppetError>;
-    async fn tag_list(&mut self) -> Result<Vec<String>, PuppetError>;
+    async fn tag_contact_add(&self, tag_id: String, contact_id: String) -> Result<(), PuppetError>;
+    async fn tag_contact_remove(&self, tag_id: String, contact_id: String) -> Result<(), PuppetError>;
+    async fn tag_contact_delete(&self, tag_id: String) -> Result<(), PuppetError>;
+    async fn tag_contact_list(&self, contact_id: String) -> Result<Vec<String>, PuppetError>;
+    async fn tag_list(&self) -> Result<Vec<String>, PuppetError>;
 
-    async fn contact_alias(&mut self, contact_id: String) -> Result<String, PuppetError>;
-    async fn contact_alias_set(&mut self, contact_id: String, alias: String) -> Result<(), PuppetError>;
-    async fn contact_avatar(&mut self, contact_id: String) -> Result<FileBox, PuppetError>;
-    async fn contact_avatar_set(&mut self, contact_id: String, file: FileBox) -> Result<(), PuppetError>;
-    async fn contact_phone_set(&mut self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError>;
+    async fn contact_alias(&self, contact_id: String) -> Result<String, PuppetError>;
+    async fn contact_alias_set(&self, contact_id: String, alias: String) -> Result<(), PuppetError>;
+    async fn contact_avatar(&self, contact_id: String) -> Result<FileBox, PuppetError>;
+    async fn contact_avatar_set(&self, contact_id: String, file: FileBox) -> Result<(), PuppetError>;
+    async fn contact_phone_set(&self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError>;
     async fn contact_corporation_remark_set(
-        &mut self,
+        &self,
         contact_id: String,
         corporation_remark: Option<String>,
     ) -> Result<(), PuppetError>;
-    async fn contact_description_set(
-        &mut self,
-        contact_id: String,
-        description: Option<String>,
-    ) -> Result<(), PuppetError>;
-    async fn contact_list(&mut self) -> Result<Vec<String>, PuppetError>;
-    async fn contact_raw_payload(&mut self, contact_id: String) -> Result<ContactPayload, PuppetError>;
+    async fn contact_description_set(&self, contact_id: String, description: Option<String>)
+        -> Result<(), PuppetError>;
+    async fn contact_list(&self) -> Result<Vec<String>, PuppetError>;
+    async fn contact_raw_payload(&self, contact_id: String) -> Result<ContactPayload, PuppetError>;
 
-    async fn message_contact(&mut self, message_id: String) -> Result<String, PuppetError>;
-    async fn message_file(&mut self, message_id: String) -> Result<FileBox, PuppetError>;
-    async fn message_image(&mut self, message_id: String, image_type: ImageType) -> Result<FileBox, PuppetError>;
-    async fn message_mini_program(&mut self, message_id: String) -> Result<MiniProgramPayload, PuppetError>;
-    async fn message_url(&mut self, message_id: String) -> Result<UrlLinkPayload, PuppetError>;
+    async fn message_contact(&self, message_id: String) -> Result<String, PuppetError>;
+    async fn message_file(&self, message_id: String) -> Result<FileBox, PuppetError>;
+    async fn message_image(&self, message_id: String, image_type: ImageType) -> Result<FileBox, PuppetError>;
+    async fn message_mini_program(&self, message_id: String) -> Result<MiniProgramPayload, PuppetError>;
+    async fn message_url(&self, message_id: String) -> Result<UrlLinkPayload, PuppetError>;
     async fn message_send_contact(
-        &mut self,
+        &self,
         conversation_id: String,
         contact_id: String,
     ) -> Result<Option<String>, PuppetError>;
-    async fn message_send_file(
-        &mut self,
-        conversation_id: String,
-        file: FileBox,
-    ) -> Result<Option<String>, PuppetError>;
+    async fn message_send_file(&self, conversation_id: String, file: FileBox) -> Result<Option<String>, PuppetError>;
     async fn message_send_mini_program(
-        &mut self,
+        &self,
         conversation_id: String,
         mini_program_payload: MiniProgramPayload,
     ) -> Result<Option<String>, PuppetError>;
     async fn message_send_text(
-        &mut self,
+        &self,
         conversation_id: String,
         text: String,
         mention_id_list: Vec<String>,
     ) -> Result<Option<String>, PuppetError>;
     async fn message_send_url(
-        &mut self,
+        &self,
         conversation_id: String,
         url_link_payload: UrlLinkPayload,
     ) -> Result<Option<String>, PuppetError>;
-    async fn message_raw_payload(&mut self, message_id: String) -> Result<MessagePayload, PuppetError>;
+    async fn message_raw_payload(&self, message_id: String) -> Result<MessagePayload, PuppetError>;
 
-    async fn friendship_accept(&mut self, friendship_id: String) -> Result<(), PuppetError>;
-    async fn friendship_add(&mut self, contact_id: String, hello: Option<String>) -> Result<(), PuppetError>;
-    async fn friendship_search_phone(&mut self, phone: String) -> Result<Option<String>, PuppetError>;
-    async fn friendship_search_weixin(&mut self, weixin: String) -> Result<Option<String>, PuppetError>;
-    async fn friendship_raw_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError>;
+    async fn friendship_accept(&self, friendship_id: String) -> Result<(), PuppetError>;
+    async fn friendship_add(&self, contact_id: String, hello: Option<String>) -> Result<(), PuppetError>;
+    async fn friendship_search_phone(&self, phone: String) -> Result<Option<String>, PuppetError>;
+    async fn friendship_search_weixin(&self, weixin: String) -> Result<Option<String>, PuppetError>;
+    async fn friendship_raw_payload(&self, friendship_id: String) -> Result<FriendshipPayload, PuppetError>;
 
-    async fn room_invitation_accept(&mut self, room_invitation_id: String) -> Result<(), PuppetError>;
+    async fn room_invitation_accept(&self, room_invitation_id: String) -> Result<(), PuppetError>;
     async fn room_invitation_raw_payload(
-        &mut self,
+        &self,
         room_invitation_id: String,
     ) -> Result<RoomInvitationPayload, PuppetError>;
 
-    async fn room_add(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
-    async fn room_avatar(&mut self, room_id: String) -> Result<FileBox, PuppetError>;
-    async fn room_create(&mut self, contact_id_list: Vec<String>, topic: Option<String>)
-        -> Result<String, PuppetError>;
-    async fn room_del(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
-    async fn room_qr_code(&mut self, room_id: String) -> Result<String, PuppetError>;
-    async fn room_quit(&mut self, room_id: String) -> Result<(), PuppetError>;
-    async fn room_topic(&mut self, room_id: String) -> Result<String, PuppetError>;
-    async fn room_topic_set(&mut self, room_id: String, topic: String) -> Result<(), PuppetError>;
-    async fn room_list(&mut self) -> Result<Vec<String>, PuppetError>;
-    async fn room_raw_payload(&mut self, room_id: String) -> Result<RoomPayload, PuppetError>;
+    async fn room_add(&self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
+    async fn room_avatar(&self, room_id: String) -> Result<FileBox, PuppetError>;
+    async fn room_create(&self, contact_id_list: Vec<String>, topic: Option<String>) -> Result<String, PuppetError>;
+    async fn room_del(&self, room_id: String, contact_id: String) -> Result<(), PuppetError>;
+    async fn room_qr_code(&self, room_id: String) -> Result<String, PuppetError>;
+    async fn room_quit(&self, room_id: String) -> Result<(), PuppetError>;
+    async fn room_topic(&self, room_id: String) -> Result<String, PuppetError>;
+    async fn room_topic_set(&self, room_id: String, topic: String) -> Result<(), PuppetError>;
+    async fn room_list(&self) -> Result<Vec<String>, PuppetError>;
+    async fn room_raw_payload(&self, room_id: String) -> Result<RoomPayload, PuppetError>;
 
-    async fn room_announce(&mut self, room_id: String) -> Result<String, PuppetError>;
-    async fn room_announce_set(&mut self, room_id: String, text: String) -> Result<(), PuppetError>;
-    async fn room_member_list(&mut self, room_id: String) -> Result<Vec<String>, PuppetError>;
+    async fn room_announce(&self, room_id: String) -> Result<String, PuppetError>;
+    async fn room_announce_set(&self, room_id: String, text: String) -> Result<(), PuppetError>;
+    async fn room_member_list(&self, room_id: String) -> Result<Vec<String>, PuppetError>;
     async fn room_member_raw_payload(
-        &mut self,
+        &self,
         room_id: String,
         contact_id: String,
     ) -> Result<RoomMemberPayload, PuppetError>;

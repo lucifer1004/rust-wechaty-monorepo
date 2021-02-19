@@ -22,7 +22,7 @@ where
         };
         Self {
             id_: id,
-            ctx,
+            ctx_: ctx,
             payload_: payload,
         }
     }
@@ -49,19 +49,19 @@ where
         if self.is_ready() {
             Ok(())
         } else {
-            let mut puppet = self.ctx.puppet();
+            let mut puppet = self.ctx_.puppet();
             match puppet.message_payload(self.id()).await {
                 Ok(payload) => {
-                    self.ctx.messages().insert(self.id(), payload.clone());
+                    self.ctx_.messages().insert(self.id(), payload.clone());
                     self.payload_ = Some(payload.clone());
                     if !payload.from_id.is_empty() {
-                        self.ctx.contact_load(payload.from_id.clone()).await;
+                        self.ctx_.contact_load(payload.from_id.clone()).await;
                     }
                     if !payload.to_id.is_empty() {
-                        self.ctx.contact_load(payload.to_id.clone()).await;
+                        self.ctx_.contact_load(payload.to_id.clone()).await;
                     }
                     if !payload.room_id.is_empty() {
-                        self.ctx.room_load(payload.room_id.clone()).await;
+                        self.ctx_.room_load(payload.room_id.clone()).await;
                     }
                     Ok(())
                 }
@@ -109,7 +109,7 @@ where
         match &self.payload_ {
             Some(payload) => {
                 if !payload.from_id.is_empty() {
-                    Some(Contact::new(payload.from_id.clone(), self.ctx.clone(), None))
+                    Some(Contact::new(payload.from_id.clone(), self.ctx_.clone(), None))
                 } else {
                     None
                 }
@@ -123,7 +123,7 @@ where
         match &self.payload_ {
             Some(payload) => {
                 if !payload.to_id.is_empty() {
-                    Some(Contact::new(payload.to_id.clone(), self.ctx.clone(), None))
+                    Some(Contact::new(payload.to_id.clone(), self.ctx_.clone(), None))
                 } else {
                     None
                 }
@@ -137,7 +137,7 @@ where
         match &self.payload_ {
             Some(payload) => {
                 if !payload.room_id.is_empty() {
-                    Some(Room::new(payload.room_id.clone(), self.ctx.clone(), None))
+                    Some(Room::new(payload.room_id.clone(), self.ctx_.clone(), None))
                 } else {
                     None
                 }
@@ -166,7 +166,7 @@ where
     pub async fn mention_list(&mut self) -> Option<Vec<Contact<T>>> {
         debug!("message.mention_list(id = {})", self.id_);
         match &self.payload_ {
-            Some(payload) => Some(self.ctx.contact_load_batch(payload.mention_id_list.clone()).await),
+            Some(payload) => Some(self.ctx_.contact_load_batch(payload.mention_id_list.clone()).await),
             None => None,
         }
     }

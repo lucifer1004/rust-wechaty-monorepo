@@ -15,7 +15,7 @@ use crate::service_endpoint::discover;
 
 #[derive(Clone)]
 pub struct PuppetService {
-    client: PuppetClient<Channel>,
+    client_: PuppetClient<Channel>,
     addr: Addr<PuppetServiceInner>,
 }
 
@@ -46,7 +46,7 @@ impl PuppetService {
                         info!("Subscribed event stream");
                         let addr = PuppetServiceInner::new().start();
                         let puppet_service = Self {
-                            client,
+                            client_: client,
                             addr: addr.clone(),
                         };
                         let puppet = Puppet::new(puppet_service);
@@ -60,6 +60,10 @@ impl PuppetService {
             }
             Err(e) => panic!("Failed to establish RPC connection, {}", e),
         }
+    }
+
+    fn client(&self) -> PuppetClient<Channel> {
+        self.client_.clone()
     }
 }
 
@@ -346,26 +350,26 @@ impl StreamHandler<Result<EventResponse, Status>> for PuppetServiceInner {
 
 #[async_trait]
 impl PuppetImpl for PuppetService {
-    async fn contact_self_name_set(&mut self, name: String) -> Result<(), PuppetError> {
+    async fn contact_self_name_set(&self, name: String) -> Result<(), PuppetError> {
         debug!("contact_self_name_set(name = {})", name);
-        match self.client.contact_self_name(ContactSelfNameRequest { name }).await {
+        match self.client().contact_self_name(ContactSelfNameRequest { name }).await {
             Ok(_) => Ok(()),
             Err(_) => Err(PuppetError::Network("Failed to set contact self name".to_owned())),
         }
     }
 
-    async fn contact_self_qr_code(&mut self) -> Result<String, PuppetError> {
+    async fn contact_self_qr_code(&self) -> Result<String, PuppetError> {
         debug!("contact_self_qr_code()");
-        match self.client.contact_self_qr_code(ContactSelfQrCodeRequest {}).await {
+        match self.client().contact_self_qr_code(ContactSelfQrCodeRequest {}).await {
             Ok(response) => Ok(response.into_inner().qrcode),
             Err(_) => Err(PuppetError::Network("Failed to get contact self qrcode".to_owned())),
         }
     }
 
-    async fn contact_self_signature_set(&mut self, signature: String) -> Result<(), PuppetError> {
+    async fn contact_self_signature_set(&self, signature: String) -> Result<(), PuppetError> {
         debug!("contact_self_signature_set(signature = {})", signature);
         match self
-            .client
+            .client()
             .contact_self_signature(ContactSelfSignatureRequest { signature })
             .await
         {
@@ -374,10 +378,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn tag_contact_add(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn tag_contact_add(&self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
         debug!("tag_contact_add(tag_id = {}, contact_id = {})", tag_id, contact_id);
         match self
-            .client
+            .client()
             .tag_contact_add(TagContactAddRequest {
                 id: tag_id.clone(),
                 contact_id: contact_id.clone(),
@@ -392,10 +396,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn tag_contact_remove(&mut self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn tag_contact_remove(&self, tag_id: String, contact_id: String) -> Result<(), PuppetError> {
         debug!("tag_contact_remove(tag_id = {}, contact_id = {})", tag_id, contact_id);
         match self
-            .client
+            .client()
             .tag_contact_remove(TagContactRemoveRequest {
                 id: tag_id.clone(),
                 contact_id: contact_id.clone(),
@@ -410,10 +414,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn tag_contact_delete(&mut self, tag_id: String) -> Result<(), PuppetError> {
+    async fn tag_contact_delete(&self, tag_id: String) -> Result<(), PuppetError> {
         debug!("tag_contact_delete(tag_id = {})", tag_id);
         match self
-            .client
+            .client()
             .tag_contact_delete(TagContactDeleteRequest { id: tag_id.clone() })
             .await
         {
@@ -422,10 +426,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn tag_contact_list(&mut self, contact_id: String) -> Result<Vec<String>, PuppetError> {
+    async fn tag_contact_list(&self, contact_id: String) -> Result<Vec<String>, PuppetError> {
         debug!("tag_contact_list(contact_id = {})", contact_id);
         match self
-            .client
+            .client()
             .tag_contact_list(TagContactListRequest {
                 contact_id: Some(contact_id.clone()),
             })
@@ -439,10 +443,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn tag_list(&mut self) -> Result<Vec<String>, PuppetError> {
+    async fn tag_list(&self) -> Result<Vec<String>, PuppetError> {
         debug!("tag_list()");
         match self
-            .client
+            .client()
             .tag_contact_list(TagContactListRequest { contact_id: None })
             .await
         {
@@ -451,10 +455,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn contact_alias(&mut self, contact_id: String) -> Result<String, PuppetError> {
+    async fn contact_alias(&self, contact_id: String) -> Result<String, PuppetError> {
         debug!("contact_alias(contact_id = {})", contact_id);
         match self
-            .client
+            .client()
             .contact_alias(ContactAliasRequest {
                 id: contact_id.clone(),
                 alias: None,
@@ -469,10 +473,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn contact_alias_set(&mut self, contact_id: String, alias: String) -> Result<(), PuppetError> {
+    async fn contact_alias_set(&self, contact_id: String, alias: String) -> Result<(), PuppetError> {
         debug!("contact_alias_set(contact_id = {}, alias = {})", contact_id, alias);
         match self
-            .client
+            .client()
             .contact_alias(ContactAliasRequest {
                 id: contact_id.clone(),
                 alias: Some(alias.clone()),
@@ -487,10 +491,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn contact_avatar(&mut self, contact_id: String) -> Result<FileBox, PuppetError> {
+    async fn contact_avatar(&self, contact_id: String) -> Result<FileBox, PuppetError> {
         debug!("contact_avatar(contact_id = {})", contact_id);
         match self
-            .client
+            .client()
             .contact_avatar(ContactAvatarRequest {
                 id: contact_id.clone(),
                 filebox: None,
@@ -505,10 +509,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn contact_avatar_set(&mut self, contact_id: String, file: FileBox) -> Result<(), PuppetError> {
+    async fn contact_avatar_set(&self, contact_id: String, file: FileBox) -> Result<(), PuppetError> {
         debug!("contact_avatar_set(contact_id = {}, file = {})", contact_id, file);
         match self
-            .client
+            .client()
             .contact_avatar(ContactAvatarRequest {
                 id: contact_id.clone(),
                 filebox: Some(file.to_string()),
@@ -523,13 +527,13 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn contact_phone_set(&mut self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError> {
+    async fn contact_phone_set(&self, contact_id: String, phone_list: Vec<String>) -> Result<(), PuppetError> {
         debug!(
             "contact_phone_set(contact_id = {}, phone_list = {:?})",
             contact_id, phone_list
         );
         match self
-            .client
+            .client()
             .contact_phone(ContactPhoneRequest {
                 contact_id: contact_id.clone(),
                 phone_list,
@@ -545,7 +549,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn contact_corporation_remark_set(
-        &mut self,
+        &self,
         contact_id: String,
         corporation_remark: Option<String>,
     ) -> Result<(), PuppetError> {
@@ -554,7 +558,7 @@ impl PuppetImpl for PuppetService {
             contact_id, corporation_remark
         );
         match self
-            .client
+            .client()
             .contact_corporation_remark(ContactCorporationRemarkRequest {
                 contact_id: contact_id.clone(),
                 corporation_remark,
@@ -570,7 +574,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn contact_description_set(
-        &mut self,
+        &self,
         contact_id: String,
         description: Option<String>,
     ) -> Result<(), PuppetError> {
@@ -579,7 +583,7 @@ impl PuppetImpl for PuppetService {
             contact_id, description
         );
         match self
-            .client
+            .client()
             .contact_description(ContactDescriptionRequest {
                 contact_id: contact_id.clone(),
                 description,
@@ -594,18 +598,18 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn contact_list(&mut self) -> Result<Vec<String>, PuppetError> {
+    async fn contact_list(&self) -> Result<Vec<String>, PuppetError> {
         debug!("contact_list()");
-        match self.client.contact_list(ContactListRequest {}).await {
+        match self.client().contact_list(ContactListRequest {}).await {
             Ok(response) => Ok(response.into_inner().ids),
             Err(_) => Err(PuppetError::Network(format!("Failed to get contacts"))),
         }
     }
 
-    async fn contact_raw_payload(&mut self, contact_id: String) -> Result<ContactPayload, PuppetError> {
+    async fn contact_raw_payload(&self, contact_id: String) -> Result<ContactPayload, PuppetError> {
         debug!("contact_raw_payload(contact_id = {})", contact_id);
         match self
-            .client
+            .client()
             .contact_payload(ContactPayloadRequest { id: contact_id.clone() })
             .await
         {
@@ -617,10 +621,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn message_contact(&mut self, message_id: String) -> Result<String, PuppetError> {
+    async fn message_contact(&self, message_id: String) -> Result<String, PuppetError> {
         debug!("message_contact(message_id = {})", message_id);
         match self
-            .client
+            .client()
             .message_contact(MessageContactRequest { id: message_id.clone() })
             .await
         {
@@ -632,10 +636,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn message_file(&mut self, message_id: String) -> Result<FileBox, PuppetError> {
+    async fn message_file(&self, message_id: String) -> Result<FileBox, PuppetError> {
         debug!("message_file(message_id = {})", message_id);
         match self
-            .client
+            .client()
             .message_file(MessageFileRequest { id: message_id.clone() })
             .await
         {
@@ -647,10 +651,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn message_image(&mut self, message_id: String, image_type: ImageType) -> Result<FileBox, PuppetError> {
+    async fn message_image(&self, message_id: String, image_type: ImageType) -> Result<FileBox, PuppetError> {
         debug!("message_image(message_id = {})", message_id);
         match self
-            .client
+            .client()
             .message_image(MessageImageRequest {
                 id: message_id.clone(),
                 r#type: image_type.to_i32().unwrap(),
@@ -665,10 +669,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn message_mini_program(&mut self, message_id: String) -> Result<MiniProgramPayload, PuppetError> {
+    async fn message_mini_program(&self, message_id: String) -> Result<MiniProgramPayload, PuppetError> {
         debug!("message_mini_program(message_id = {})", message_id);
         match self
-            .client
+            .client()
             .message_mini_program(MessageMiniProgramRequest { id: message_id.clone() })
             .await
         {
@@ -680,10 +684,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn message_url(&mut self, message_id: String) -> Result<UrlLinkPayload, PuppetError> {
+    async fn message_url(&self, message_id: String) -> Result<UrlLinkPayload, PuppetError> {
         debug!("message_url(message_id = {})", message_id);
         match self
-            .client
+            .client()
             .message_url(MessageUrlRequest { id: message_id.clone() })
             .await
         {
@@ -696,7 +700,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn message_send_contact(
-        &mut self,
+        &self,
         conversation_id: String,
         contact_id: String,
     ) -> Result<Option<String>, PuppetError> {
@@ -705,7 +709,7 @@ impl PuppetImpl for PuppetService {
             conversation_id, contact_id
         );
         match self
-            .client
+            .client()
             .message_send_contact(MessageSendContactRequest {
                 conversation_id: conversation_id.clone(),
                 contact_id: contact_id.clone(),
@@ -720,17 +724,13 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn message_send_file(
-        &mut self,
-        conversation_id: String,
-        file: FileBox,
-    ) -> Result<Option<String>, PuppetError> {
+    async fn message_send_file(&self, conversation_id: String, file: FileBox) -> Result<Option<String>, PuppetError> {
         debug!(
             "message_send_file(conversation_id = {}, file = {})",
             conversation_id, file
         );
         match self
-            .client
+            .client()
             .message_send_file(MessageSendFileRequest {
                 conversation_id: conversation_id.clone(),
                 filebox: file.to_string(),
@@ -746,7 +746,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn message_send_mini_program(
-        &mut self,
+        &self,
         conversation_id: String,
         mini_program_payload: MiniProgramPayload,
     ) -> Result<Option<String>, PuppetError> {
@@ -755,7 +755,7 @@ impl PuppetImpl for PuppetService {
             conversation_id, mini_program_payload
         );
         match self
-            .client
+            .client()
             .message_send_mini_program(MessageSendMiniProgramRequest {
                 conversation_id: conversation_id.clone(),
                 mini_program: to_string::<MiniProgramPayload>(&mini_program_payload).unwrap(),
@@ -771,7 +771,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn message_send_text(
-        &mut self,
+        &self,
         conversation_id: String,
         text: String,
         mention_id_list: Vec<String>,
@@ -781,7 +781,7 @@ impl PuppetImpl for PuppetService {
             conversation_id, text, mention_id_list
         );
         match self
-            .client
+            .client()
             .message_send_text(MessageSendTextRequest {
                 conversation_id: conversation_id.clone(),
                 text,
@@ -798,7 +798,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn message_send_url(
-        &mut self,
+        &self,
         conversation_id: String,
         url_link_payload: UrlLinkPayload,
     ) -> Result<Option<String>, PuppetError> {
@@ -807,7 +807,7 @@ impl PuppetImpl for PuppetService {
             conversation_id, url_link_payload
         );
         match self
-            .client
+            .client()
             .message_send_url(MessageSendUrlRequest {
                 conversation_id: conversation_id.clone(),
                 url_link: to_string::<UrlLinkPayload>(&url_link_payload).unwrap(),
@@ -822,10 +822,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn message_raw_payload(&mut self, message_id: String) -> Result<MessagePayload, PuppetError> {
+    async fn message_raw_payload(&self, message_id: String) -> Result<MessagePayload, PuppetError> {
         debug!("message_raw_payload(message_id = {})", message_id);
         match self
-            .client
+            .client()
             .message_payload(MessagePayloadRequest { id: message_id.clone() })
             .await
         {
@@ -837,10 +837,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn friendship_accept(&mut self, friendship_id: String) -> Result<(), PuppetError> {
+    async fn friendship_accept(&self, friendship_id: String) -> Result<(), PuppetError> {
         debug!("friendship_accept(friendship_id = {})", friendship_id);
         match self
-            .client
+            .client()
             .friendship_accept(FriendshipAcceptRequest {
                 id: friendship_id.clone(),
             })
@@ -854,10 +854,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn friendship_add(&mut self, contact_id: String, hello: Option<String>) -> Result<(), PuppetError> {
+    async fn friendship_add(&self, contact_id: String, hello: Option<String>) -> Result<(), PuppetError> {
         debug!("friendship_add(contact_id = {}, hello = {:?})", contact_id, hello);
         match self
-            .client
+            .client()
             .friendship_add(FriendshipAddRequest {
                 contact_id: contact_id.clone(),
                 hello: if let Some(hello) = hello { hello } else { String::new() },
@@ -869,10 +869,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn friendship_search_phone(&mut self, phone: String) -> Result<Option<String>, PuppetError> {
+    async fn friendship_search_phone(&self, phone: String) -> Result<Option<String>, PuppetError> {
         debug!("friendship_search_phone(phone = {})", phone);
         match self
-            .client
+            .client()
             .friendship_search_phone(FriendshipSearchPhoneRequest { phone: phone.clone() })
             .await
         {
@@ -881,10 +881,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn friendship_search_weixin(&mut self, weixin: String) -> Result<Option<String>, PuppetError> {
+    async fn friendship_search_weixin(&self, weixin: String) -> Result<Option<String>, PuppetError> {
         debug!("friendship_search_weixin(weixin = {})", weixin);
         match self
-            .client
+            .client()
             .friendship_search_weixin(FriendshipSearchWeixinRequest { weixin: weixin.clone() })
             .await
         {
@@ -893,10 +893,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn friendship_raw_payload(&mut self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
+    async fn friendship_raw_payload(&self, friendship_id: String) -> Result<FriendshipPayload, PuppetError> {
         debug!("friendship_raw_payload(friendship_id = {})", friendship_id);
         match self
-            .client
+            .client()
             .friendship_payload(FriendshipPayloadRequest {
                 id: friendship_id.clone(),
                 payload: None,
@@ -911,10 +911,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_invitation_accept(&mut self, room_invitation_id: String) -> Result<(), PuppetError> {
+    async fn room_invitation_accept(&self, room_invitation_id: String) -> Result<(), PuppetError> {
         debug!("room_invitation_accept(room_invitation_id = {})", room_invitation_id);
         match self
-            .client
+            .client()
             .room_invitation_accept(RoomInvitationAcceptRequest {
                 id: room_invitation_id.clone(),
             })
@@ -929,7 +929,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn room_invitation_raw_payload(
-        &mut self,
+        &self,
         room_invitation_id: String,
     ) -> Result<RoomInvitationPayload, PuppetError> {
         debug!(
@@ -937,7 +937,7 @@ impl PuppetImpl for PuppetService {
             room_invitation_id
         );
         match self
-            .client
+            .client()
             .room_invitation_payload(RoomInvitationPayloadRequest {
                 id: room_invitation_id.clone(),
                 payload: None,
@@ -952,10 +952,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_add(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn room_add(&self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
         debug!("room_add(room_id = {}, contact_id = {})", room_id, contact_id);
         match self
-            .client
+            .client()
             .room_add(RoomAddRequest {
                 id: room_id.clone(),
                 contact_id: contact_id.clone(),
@@ -970,9 +970,13 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_avatar(&mut self, room_id: String) -> Result<FileBox, PuppetError> {
+    async fn room_avatar(&self, room_id: String) -> Result<FileBox, PuppetError> {
         debug!("room_avatar(room_id = {})", room_id);
-        match self.client.room_avatar(RoomAvatarRequest { id: room_id.clone() }).await {
+        match self
+            .client()
+            .room_avatar(RoomAvatarRequest { id: room_id.clone() })
+            .await
+        {
             Ok(response) => Ok(FileBox::from(response.into_inner().filebox)),
             Err(_) => Err(PuppetError::Network(format!(
                 "Failed to get avatar of room {}",
@@ -981,17 +985,13 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_create(
-        &mut self,
-        contact_id_list: Vec<String>,
-        topic: Option<String>,
-    ) -> Result<String, PuppetError> {
+    async fn room_create(&self, contact_id_list: Vec<String>, topic: Option<String>) -> Result<String, PuppetError> {
         debug!(
             "room_create(contact_id_list = {:?}, topic = {:?})",
             contact_id_list, topic
         );
         match self
-            .client
+            .client()
             .room_create(RoomCreateRequest {
                 contact_ids: contact_id_list,
                 topic: if let Some(topic) = topic { topic } else { String::new() },
@@ -1003,10 +1003,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_del(&mut self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
+    async fn room_del(&self, room_id: String, contact_id: String) -> Result<(), PuppetError> {
         debug!("room_del(room_id = {}, contact_id = {})", room_id, contact_id);
         match self
-            .client
+            .client()
             .room_del(RoomDelRequest {
                 id: room_id.clone(),
                 contact_id: contact_id.clone(),
@@ -1021,10 +1021,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_qr_code(&mut self, room_id: String) -> Result<String, PuppetError> {
+    async fn room_qr_code(&self, room_id: String) -> Result<String, PuppetError> {
         debug!("room_qr_code(room_id = {})", room_id);
         match self
-            .client
+            .client()
             .room_qr_code(RoomQrCodeRequest { id: room_id.clone() })
             .await
         {
@@ -1036,18 +1036,18 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_quit(&mut self, room_id: String) -> Result<(), PuppetError> {
+    async fn room_quit(&self, room_id: String) -> Result<(), PuppetError> {
         debug!("room_quit(room_id = {})", room_id);
-        match self.client.room_quit(RoomQuitRequest { id: room_id.clone() }).await {
+        match self.client().room_quit(RoomQuitRequest { id: room_id.clone() }).await {
             Ok(_) => Ok(()),
             Err(_) => Err(PuppetError::Network(format!("Failed to quit room {}", room_id))),
         }
     }
 
-    async fn room_topic(&mut self, room_id: String) -> Result<String, PuppetError> {
+    async fn room_topic(&self, room_id: String) -> Result<String, PuppetError> {
         debug!("room_topic(room_id = {})", room_id);
         match self
-            .client
+            .client()
             .room_topic(RoomTopicRequest {
                 id: room_id.clone(),
                 topic: None,
@@ -1059,10 +1059,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_topic_set(&mut self, room_id: String, topic: String) -> Result<(), PuppetError> {
+    async fn room_topic_set(&self, room_id: String, topic: String) -> Result<(), PuppetError> {
         debug!("room_topic_set(room_id = {}, topic = {})", room_id, topic);
         match self
-            .client
+            .client()
             .room_topic(RoomTopicRequest {
                 id: room_id.clone(),
                 topic: Some(topic),
@@ -1077,18 +1077,18 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_list(&mut self) -> Result<Vec<String>, PuppetError> {
+    async fn room_list(&self) -> Result<Vec<String>, PuppetError> {
         debug!("room_list()");
-        match self.client.room_list(RoomListRequest {}).await {
+        match self.client().room_list(RoomListRequest {}).await {
             Ok(response) => Ok(response.into_inner().ids),
             Err(_) => Err(PuppetError::Network(format!("Failed to get rooms"))),
         }
     }
 
-    async fn room_raw_payload(&mut self, room_id: String) -> Result<RoomPayload, PuppetError> {
+    async fn room_raw_payload(&self, room_id: String) -> Result<RoomPayload, PuppetError> {
         debug!("room_raw_payload(room_id = {})", room_id);
         match self
-            .client
+            .client()
             .room_payload(RoomPayloadRequest { id: room_id.clone() })
             .await
         {
@@ -1100,10 +1100,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_announce(&mut self, room_id: String) -> Result<String, PuppetError> {
+    async fn room_announce(&self, room_id: String) -> Result<String, PuppetError> {
         debug!("room_announce(room_id = {})", room_id);
         match self
-            .client
+            .client()
             .room_announce(RoomAnnounceRequest {
                 id: room_id.clone(),
                 text: None,
@@ -1118,10 +1118,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_announce_set(&mut self, room_id: String, text: String) -> Result<(), PuppetError> {
+    async fn room_announce_set(&self, room_id: String, text: String) -> Result<(), PuppetError> {
         debug!("room_announce(room_id = {}, text = {})", room_id, text);
         match self
-            .client
+            .client()
             .room_announce(RoomAnnounceRequest {
                 id: room_id.clone(),
                 text: Some(text),
@@ -1136,10 +1136,10 @@ impl PuppetImpl for PuppetService {
         }
     }
 
-    async fn room_member_list(&mut self, room_id: String) -> Result<Vec<String>, PuppetError> {
+    async fn room_member_list(&self, room_id: String) -> Result<Vec<String>, PuppetError> {
         debug!("room_member_list(room_id = {})", room_id);
         match self
-            .client
+            .client()
             .room_member_list(RoomMemberListRequest { id: room_id.clone() })
             .await
         {
@@ -1152,7 +1152,7 @@ impl PuppetImpl for PuppetService {
     }
 
     async fn room_member_raw_payload(
-        &mut self,
+        &self,
         room_id: String,
         contact_id: String,
     ) -> Result<RoomMemberPayload, PuppetError> {
@@ -1161,7 +1161,7 @@ impl PuppetImpl for PuppetService {
             room_id, contact_id
         );
         match self
-            .client
+            .client()
             .room_member_payload(RoomMemberPayloadRequest {
                 id: room_id.clone(),
                 member_id: contact_id.clone(),
