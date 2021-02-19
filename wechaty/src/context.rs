@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use futures::StreamExt;
 use log::{debug, error};
-use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetImpl, RoomPayload};
+use wechaty_puppet::{
+    ContactPayload, ContactQueryFilter, MessagePayload, MessageQueryFilter, Puppet, PuppetImpl, RoomPayload,
+};
 
 use crate::{Contact, IntoContact, Message, Room, WechatyError};
 
@@ -61,12 +63,21 @@ where
         self.id_ = None;
     }
 
+    fn logged_in(&self) -> bool {
+        self.id_.is_some()
+    }
+
     /// Load a contact.
     ///
     /// Use contact store first, if the contact cannot be found in the local store,
     /// try to fetch from the puppet instead.
     pub(crate) async fn contact_load(&self, contact_id: String) -> Result<Contact<T>, WechatyError> {
         debug!("contact_load(query = {})", contact_id);
+
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
+
         let payload = {
             match self.contacts().get(&contact_id) {
                 Some(payload) => Some(payload.clone()),
@@ -86,16 +97,6 @@ where
         }
     }
 
-    /// Find a contact by query
-    pub async fn contact_find(&self, query: ContactQueryFilter) {
-        unimplemented!()
-    }
-
-    /// Find a contact by string
-    pub async fn contact_find_by_string(&self, query_str: String) {
-        unimplemented!()
-    }
-
     /// Batch load contacts with a default batch size of 16.
     ///
     /// Reference: [Batch execution of futures in the tokio runtime](https://users.rust-lang.org/t/batch-execution-of-futures-in-the-tokio-runtime-or-max-number-of-active-futures-at-a-time/47659).
@@ -103,7 +104,7 @@ where
     /// Note the API change: `tokio::stream::iter` is now temporarily `tokio_stream::iter`, according to
     /// [tokio's tutorial](https://tokio.rs/tokio/tutorial/streams), it will be moved back to the `tokio`
     /// crate when the `Stream` trait is stable.
-    pub(crate) async fn contact_load_batch(&mut self, contact_id_list: Vec<String>) -> Vec<Contact<T>> {
+    pub(crate) async fn contact_load_batch(&self, contact_id_list: Vec<String>) -> Vec<Contact<T>> {
         debug!("contact_load_batch(contact_id_list = {:?})", contact_id_list);
         let mut contact_list = vec![];
         let mut stream = tokio_stream::iter(contact_id_list)
@@ -117,24 +118,62 @@ where
         contact_list
     }
 
-    pub async fn contact_find_all_by_string(&mut self, query_str: String) -> Result<Vec<Contact<T>>, WechatyError> {
-        debug!("contact_find_all_by_string(query_str = {:?})", query_str);
-        match self.puppet_.contact_search_by_string(query_str, None).await {
+    /// Find the first contact that matches the query
+    pub async fn contact_find(&self, query: ContactQueryFilter) -> Result<Option<Contact<T>>, WechatyError> {
+        debug!("contact_find(query_str = {:?})", query_str);
+        match self.contact_find_all(Some(query)).await {
+            Ok(contact_list) => {
+                if contact_list.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(contact_list[0].clone()))
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Find the first contact that matches the query string
+    pub async fn contact_find_by_string(&self, query_str: String) -> Result<Option<Contact<T>>, WechatyError> {
+        debug!("contact_find_by_string(query_str = {:?})", query_str);
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
+        match self.contact_find_all_by_string(query_str).await {
+            Ok(contact_list) => {
+                if contact_list.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(contact_list[0].clone()))
+                }
+            }
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Find all contacts that match the query
+    pub async fn contact_find_all(&self, query: Option<ContactQueryFilter>) -> Result<Vec<Contact<T>>, WechatyError> {
+        debug!("contact_find_all(query = {:?})", query);
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
+        let query = match query {
+            Some(query) => query,
+            None => ContactQueryFilter::default(),
+        };
+        match self.puppet().contact_search(query, None).await {
             Ok(contact_id_list) => Ok(self.contact_load_batch(contact_id_list).await),
             Err(e) => Err(WechatyError::from(e)),
         }
     }
 
-    pub async fn contact_find_all(
-        &mut self,
-        query: Option<ContactQueryFilter>,
-    ) -> Result<Vec<Contact<T>>, WechatyError> {
-        debug!("contact_find_all(query = {:?})", query);
-        let query = match query {
-            Some(query) => query,
-            None => ContactQueryFilter::default(),
-        };
-        match self.puppet_.contact_search(query, None).await {
+    /// Find all contacts that match the query string
+    pub async fn contact_find_all_by_string(&self, query_str: String) -> Result<Vec<Contact<T>>, WechatyError> {
+        debug!("contact_find_all_by_string(query_str = {:?})", query_str);
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
+        match self.puppet().contact_search_by_string(query_str, None).await {
             Ok(contact_id_list) => Ok(self.contact_load_batch(contact_id_list).await),
             Err(e) => Err(WechatyError::from(e)),
         }
@@ -144,8 +183,11 @@ where
     ///
     /// Use message store first, if the message cannot be found in the local store,
     /// try to fetch from the puppet instead.
-    pub async fn message_load(&self, message_id: String) -> Result<Message<T>, WechatyError> {
+    pub(crate) async fn message_load(&self, message_id: String) -> Result<Message<T>, WechatyError> {
         debug!("message_load(query = {})", message_id);
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
         let payload = {
             match self.messages().get(&message_id) {
                 Some(payload) => Some(payload.clone()),
@@ -164,16 +206,41 @@ where
         }
     }
 
-    pub async fn message_find(&self) {
-        unimplemented!()
+    /// Find the first message that matches the query
+    pub async fn message_find(&self, query: MessageQueryFilter) -> Result<Option<Message<T>>, WechatyError> {
+        debug!("message_find_by_string(query_str = {:?})", query_str);
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
+        match self.message_find_all(query).await {
+            Ok(message_list) => {
+                if message_list.is_empty() {
+                    Ok(None)
+                } else {
+                    Ok(Some(message_list[0].clone()))
+                }
+            }
+            Err(e) => Err(e),
+        }
     }
 
-    pub async fn message_find_all(&self) {
-        unimplemented!()
+    /// Find all messages that match the query
+    pub async fn message_find_all(&self, query: MessageQueryFilter) -> Result<Vec<Message<T>>, WechatyError> {
+        debug!("message_find_all(query = {:?}", query);
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
+        match self.puppet().message_search(query).await {
+            Ok(message_id_list) => Ok(self.message_load_batch(message_id_list).await),
+            Err(e) => Err(WechatyError::from(e)),
+        }
     }
 
-    pub async fn room_load(&self, room_id: String) -> Result<Room<T>, WechatyError> {
-        debug!("room_load(query = {})", room_id);
+    pub(crate) async fn room_load(&self, room_id: String) -> Result<Room<T>, WechatyError> {
+        debug!("room_load(room_id = {})", room_id);
+        if !self.logged_in() {
+            return Err(WechatyError::NotLoggedIn);
+        }
         let payload = {
             match self.rooms().get(&room_id) {
                 Some(payload) => Some(payload.clone()),
