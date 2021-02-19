@@ -850,7 +850,7 @@ where
                     name: Some(query_str.clone()),
                     room_alias: None,
                     name_regex: None,
-                    room_alias_regex: None
+                    room_alias_regex: None,
                 },
             )
             .await;
@@ -861,7 +861,7 @@ where
                     name: None,
                     room_alias: Some(query_str),
                     name_regex: None,
-                    room_alias_regex: None
+                    room_alias_regex: None,
                 },
             )
             .await;
@@ -884,7 +884,7 @@ where
     }
 
     /// Search room members.
-    /// 
+    ///
     /// Currently, searching by contact alias is not supported.
     pub async fn room_member_search(
         &mut self,
@@ -893,8 +893,8 @@ where
     ) -> Result<Vec<String>, PuppetError> {
         debug!("room_member_search(query = {:?})", query);
         let member_id_list = match self.puppet_impl.room_member_list(room_id.clone()).await {
-                Ok(member_id_list) => member_id_list,
-                Err(e) => return Err(e),
+            Ok(member_id_list) => member_id_list,
+            Err(e) => return Err(e),
         };
         debug!("room_member_search(member_id_list.len() = {})", member_id_list.len());
 
