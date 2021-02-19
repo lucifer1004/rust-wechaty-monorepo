@@ -4,6 +4,7 @@ use wechaty_puppet::PuppetError;
 
 pub enum WechatyError {
     Puppet(PuppetError),
+    NotLoggedIn,
 }
 
 impl fmt::Debug for WechatyError {
@@ -16,6 +17,7 @@ impl fmt::Display for WechatyError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             WechatyError::Puppet(e) => write!(fmt, "Puppet error: {}", e),
+            WechatyError::NotLoggedIn => write!(fmt, "User is not logged in"),
         }
     }
 }

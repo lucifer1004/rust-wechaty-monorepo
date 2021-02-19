@@ -1,4 +1,5 @@
 pub(crate) mod contact;
+pub(crate) mod contact_self;
 pub(crate) mod entity;
 pub(crate) mod favorite;
 pub(crate) mod friendship;

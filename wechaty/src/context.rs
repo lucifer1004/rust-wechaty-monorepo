@@ -3,24 +3,25 @@ use std::sync::{Arc, Mutex, MutexGuard};
 
 use futures::StreamExt;
 use log::{debug, error};
-use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetImpl};
+use wechaty_puppet::{ContactPayload, ContactQueryFilter, MessagePayload, Puppet, PuppetImpl, RoomPayload};
 
-use crate::{Contact, Message, Room, WechatyError};
+use crate::{Contact, IntoContact, Message, Room, WechatyError};
 
 #[derive(Clone)]
 pub struct WechatyContext<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin + Send,
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     id_: Option<String>,
     puppet_: Puppet<T>,
     contacts_: Arc<Mutex<HashMap<String, ContactPayload>>>,
     messages_: Arc<Mutex<HashMap<String, MessagePayload>>>,
+    rooms_: Arc<Mutex<HashMap<String, RoomPayload>>>,
 }
 
 impl<T> WechatyContext<T>
 where
-    T: 'static + PuppetImpl + Clone + Unpin + Send,
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     pub(crate) fn new(puppet: Puppet<T>) -> Self {
         Self {
@@ -28,6 +29,7 @@ where
             puppet_: puppet,
             contacts_: Arc::new(Mutex::new(Default::default())),
             messages_: Arc::new(Mutex::new(Default::default())),
+            rooms_: Arc::new(Mutex::new(Default::default())),
         }
     }
 
@@ -43,12 +45,20 @@ where
         self.messages_.lock().unwrap()
     }
 
+    pub(crate) fn rooms(&self) -> MutexGuard<HashMap<String, RoomPayload>> {
+        self.rooms_.lock().unwrap()
+    }
+
     pub(crate) fn id(&self) -> Option<String> {
         self.id_.clone()
     }
 
     pub(crate) fn set_id(&mut self, id: String) {
         self.id_ = Some(id);
+    }
+
+    pub(crate) fn clear_id(&mut self) {
+        self.id_ = None;
     }
 
     /// Load a contact.
@@ -93,7 +103,7 @@ where
     /// Note the API changes: `tokio::stream::iter` is now temporarily `tokio_stream::iter`, according to
     /// [tokio's tutorial](https://tokio.rs/tokio/tutorial/streams), it will be moved back to the `tokio`
     /// crate when the `Stream` trait is stable.
-    async fn contact_load_batch(&mut self, contact_id_list: Vec<String>) -> Vec<Contact<T>> {
+    pub(crate) async fn contact_load_batch(&mut self, contact_id_list: Vec<String>) -> Vec<Contact<T>> {
         debug!("contact_load_batch(contact_id_list = {:?})", contact_id_list);
         let mut contact_list = vec![];
         let mut stream = tokio_stream::iter(contact_id_list)
@@ -163,7 +173,23 @@ where
     }
 
     pub async fn room_load(&self, room_id: String) -> Result<Room<T>, WechatyError> {
-        unimplemented!()
+        debug!("room_load(query = {})", room_id);
+        let payload = {
+            match self.rooms().get(&room_id) {
+                Some(payload) => Some(payload.clone()),
+                None => None,
+            }
+        };
+        match payload {
+            Some(payload) => Ok(Room::new(room_id.clone(), self.clone(), Some(payload))),
+            None => {
+                let mut room = Room::new(room_id.clone(), self.clone(), None);
+                if let Err(e) = room.ready().await {
+                    return Err(e);
+                }
+                Ok(room)
+            }
+        }
     }
 
     pub async fn room_create(&self) {

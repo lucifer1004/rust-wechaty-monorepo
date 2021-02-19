@@ -11,6 +11,7 @@ pub use wechaty_puppet::{MessageType, PuppetOptions};
 pub use crate::context::WechatyContext;
 pub use crate::error::WechatyError;
 pub use crate::payload::*;
+pub use crate::traits::contact::IntoContact;
 pub use crate::traits::event_listener::EventListener;
 pub(crate) use crate::traits::event_listener::{Command, EventListenerInner};
 pub use crate::user::contact::Contact;

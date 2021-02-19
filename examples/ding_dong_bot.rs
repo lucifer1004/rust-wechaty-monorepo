@@ -2,8 +2,8 @@
 use std::env;
 
 use wechaty::{
-    wechaty_rt, EventListener, LoginPayload, LogoutPayload, MessagePayload, MessageType, PuppetOptions, ScanPayload,
-    Wechaty, WechatyContext,
+    wechaty_rt, EventListener, IntoContact, LoginPayload, LogoutPayload, MessagePayload, MessageType, PuppetOptions,
+    ScanPayload, Wechaty, WechatyContext,
 };
 use wechaty_puppet_service::PuppetService;
 
@@ -41,8 +41,9 @@ async fn main() {
         println!("User {} has logged out", payload.contact);
     })
     .on_message(async move |payload: MessagePayload<PuppetService>, ctx| {
-        let message = payload.message;
-        println!("Got message: {}", message);
+        let mut message = payload.message;
+        let mentioned = message.mention_list().await;
+        println!("Got message: {}, mentioned: {:?}", message, mentioned);
         if message.is_self() {
             println!("Message discarded because its outgoing");
             return;
