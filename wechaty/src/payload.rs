@@ -1,9 +1,16 @@
-use wechaty_puppet::{EventDongPayload, PuppetImpl, ScanStatus};
+use wechaty_puppet::{
+    EventDongPayload, EventErrorPayload, EventHeartbeatPayload, EventReadyPayload, EventResetPayload, EventScanPayload,
+    PuppetImpl,
+};
 
 use crate::user::contact_self::ContactSelf;
-use crate::{Contact, Message, RoomInvitation, Room};
+use crate::{Contact, Message, Room, RoomInvitation};
 
 pub type DongPayload = EventDongPayload;
+
+pub type ErrorPayload = EventErrorPayload;
+
+pub type HeartbeatPayload = EventHeartbeatPayload;
 
 #[derive(Clone, Debug)]
 pub struct LoginPayload<T>
@@ -19,6 +26,7 @@ where
     T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     pub contact: ContactSelf<T>,
+    pub data: String,
 }
 
 #[derive(Clone, Debug)]
@@ -29,27 +37,24 @@ where
     pub message: Message<T>,
 }
 
-#[derive(Clone, Debug)]
-pub struct ScanPayload {
-    pub qrcode: Option<String>,
-    pub status: ScanStatus,
-}
+pub type ScanPayload = EventScanPayload;
 
-#[derive(Clone, Debug)]
-pub struct ReadyPayload {}
+pub type ReadyPayload = EventReadyPayload;
+
+pub type ResetPayload = EventResetPayload;
 
 #[derive(Clone, Debug)]
 pub struct RoomInvitePayload<T>
-    where
-        T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
+where
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     pub room_invitation: RoomInvitation<T>,
 }
 
 #[derive(Clone, Debug)]
 pub struct RoomJoinPayload<T>
-    where
-        T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
+where
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     pub room: Room<T>,
     pub invitee_list: Vec<Contact<T>>,
@@ -59,8 +64,8 @@ pub struct RoomJoinPayload<T>
 
 #[derive(Clone, Debug)]
 pub struct RoomLeavePayload<T>
-    where
-        T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
+where
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     pub room: Room<T>,
     pub removee_list: Vec<Contact<T>>,
@@ -70,8 +75,8 @@ pub struct RoomLeavePayload<T>
 
 #[derive(Clone, Debug)]
 pub struct RoomTopicPayload<T>
-    where
-        T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
+where
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
 {
     pub room: Room<T>,
     pub old_topic: String,

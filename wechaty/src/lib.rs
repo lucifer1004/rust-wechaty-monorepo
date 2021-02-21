@@ -15,6 +15,7 @@ pub use crate::traits::contact::IntoContact;
 pub use crate::traits::event_listener::EventListener;
 pub(crate) use crate::traits::event_listener::{Command, EventListenerInner};
 pub use crate::user::contact::Contact;
+pub use crate::user::contact_self::ContactSelf;
 pub(crate) use crate::user::entity::Entity;
 pub use crate::user::favorite::Favorite;
 pub use crate::user::friendship::Friendship;

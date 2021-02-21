@@ -176,7 +176,7 @@ where
     async fn send_text(&mut self, text: String) -> Result<Option<Message<T>>, WechatyError> {
         debug!("contact.send_text(id = {}, text = {})", self.id(), text);
         let ctx = self.ctx();
-        let mut puppet = ctx.puppet();
+        let puppet = ctx.puppet();
         let conversation_id = self.id();
         let message_id = match puppet.message_send_text(conversation_id, text, vec![]).await {
             Ok(Some(id)) => id,
@@ -193,7 +193,7 @@ where
     async fn send_contact(&mut self, contact_id: String) -> Result<Option<Message<T>>, WechatyError> {
         debug!("contact.send_contact(id = {}, contact_id = {})", self.id(), contact_id);
         let ctx = self.ctx();
-        let mut puppet = ctx.puppet();
+        let puppet = ctx.puppet();
         let conversation_id = self.id();
         let message_id = match puppet.message_send_contact(conversation_id, contact_id).await {
             Ok(Some(id)) => id,
@@ -210,7 +210,7 @@ where
     async fn send_file(&mut self, file: FileBox) -> Result<Option<Message<T>>, WechatyError> {
         debug!("contact.send_file(id = {})", self.id());
         let ctx = self.ctx();
-        let mut puppet = ctx.puppet();
+        let puppet = ctx.puppet();
         let conversation_id = self.id();
         let message_id = match puppet.message_send_file(conversation_id, file).await {
             Ok(Some(id)) => id,
@@ -234,7 +234,7 @@ where
             mini_program
         );
         let ctx = self.ctx();
-        let mut puppet = ctx.puppet();
+        let puppet = ctx.puppet();
         let conversation_id = self.id();
         let message_id = match puppet.message_send_mini_program(conversation_id, mini_program).await {
             Ok(Some(id)) => id,
@@ -251,7 +251,7 @@ where
     async fn send_url(&mut self, url: UrlLinkPayload) -> Result<Option<Message<T>>, WechatyError> {
         debug!("contact.send_url(id = {}, url = {:?})", self.id(), url);
         let ctx = self.ctx();
-        let mut puppet = ctx.puppet();
+        let puppet = ctx.puppet();
         let conversation_id = self.id();
         let message_id = match puppet.message_send_url(conversation_id, url).await {
             Ok(Some(id)) => id,

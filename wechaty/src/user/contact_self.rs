@@ -37,7 +37,7 @@ where
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)
         } else {
-            let mut puppet = self.ctx().puppet();
+            let puppet = self.ctx().puppet();
             let id = self.id();
             match puppet.contact_avatar_set(id, file).await {
                 Ok(_) => {
@@ -60,7 +60,7 @@ where
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)
         } else {
-            let mut puppet = self.ctx().puppet();
+            let puppet = self.ctx().puppet();
             let id = self.id();
             match puppet.contact_self_name_set(name).await {
                 Ok(_) => {
@@ -83,7 +83,7 @@ where
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)
         } else {
-            let mut puppet = self.ctx().puppet();
+            let puppet = self.ctx().puppet();
             let id = self.id();
             match puppet.contact_self_signature_set(signature).await {
                 Ok(_) => {
@@ -106,7 +106,7 @@ where
         if !self.is_self() {
             Err(WechatyError::NotLoggedIn)
         } else {
-            let mut puppet = self.ctx().puppet();
+            let puppet = self.ctx().puppet();
             match puppet.contact_self_qr_code().await {
                 Ok(qrcode) => Ok(qrcode),
                 Err(e) => Err(WechatyError::from(e)),

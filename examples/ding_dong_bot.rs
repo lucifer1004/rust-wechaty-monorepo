@@ -32,7 +32,7 @@ async fn main() {
         }
     })
     .on_login(
-        async move |payload: LoginPayload<PuppetService>, mut ctx: WechatyContext<PuppetService>| {
+        async move |payload: LoginPayload<PuppetService>, ctx: WechatyContext<PuppetService>| {
             println!("User {} has logged in", payload.contact);
             println!("Contact list: {:?}", ctx.contact_find_all(None).await);
         },

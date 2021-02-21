@@ -1,7 +1,7 @@
 use std::fmt;
 use std::time::SystemTime;
 
-use log::{debug, error, info, trace};
+use log::{debug, error, info};
 use wechaty_puppet::{FileBox, MessagePayload, MessageType, MiniProgramPayload, PuppetImpl, UrlLinkPayload};
 
 use crate::{Contact, Entity, IntoContact, Room, WechatyContext, WechatyError};

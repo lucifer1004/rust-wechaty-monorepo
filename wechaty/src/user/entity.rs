@@ -1,7 +1,7 @@
 use std::any;
 use std::fmt::Debug;
 
-use log::{error, trace};
+use log::trace;
 use wechaty_puppet::PuppetImpl;
 
 use crate::WechatyContext;

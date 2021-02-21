@@ -4,7 +4,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use futures::StreamExt;
 use log::{debug, error};
 use wechaty_puppet::{
-    ContactPayload, ContactQueryFilter, MessagePayload, MessageQueryFilter, Puppet, PuppetImpl, RoomPayload,
+    ContactPayload, ContactQueryFilter, MessagePayload, MessageQueryFilter, Puppet, PuppetImpl, RoomInvitationPayload,
+    RoomPayload,
 };
 
 use crate::{Contact, IntoContact, Message, Room, WechatyError};
@@ -19,6 +20,7 @@ where
     contacts_: Arc<Mutex<HashMap<String, ContactPayload>>>,
     messages_: Arc<Mutex<HashMap<String, MessagePayload>>>,
     rooms_: Arc<Mutex<HashMap<String, RoomPayload>>>,
+    room_invitations_: Arc<Mutex<HashMap<String, RoomInvitationPayload>>>,
 }
 
 impl<T> WechatyContext<T>
@@ -32,6 +34,7 @@ where
             contacts_: Arc::new(Mutex::new(Default::default())),
             messages_: Arc::new(Mutex::new(Default::default())),
             rooms_: Arc::new(Mutex::new(Default::default())),
+            room_invitations_: Arc::new(Mutex::new(Default::default())),
         }
     }
 
@@ -49,6 +52,10 @@ where
 
     pub(crate) fn rooms(&self) -> MutexGuard<HashMap<String, RoomPayload>> {
         self.rooms_.lock().unwrap()
+    }
+
+    pub(crate) fn room_invitations(&self) -> MutexGuard<HashMap<String, RoomInvitationPayload>> {
+        self.room_invitations_.lock().unwrap()
     }
 
     pub(crate) fn id(&self) -> Option<String> {
