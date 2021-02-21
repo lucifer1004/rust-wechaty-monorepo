@@ -9,7 +9,8 @@ pub mod types;
 
 pub use error::PuppetError;
 pub use events::PuppetEvent;
-pub use puppet::{FileBox, Puppet, PuppetImpl, Subscribe, UnSubscribe};
+pub use filebox::FileBox;
+pub use puppet::{Puppet, PuppetImpl, Subscribe, UnSubscribe};
 pub use schemas::contact::*;
 pub use schemas::event::*;
 pub use schemas::friendship::*;
@@ -22,11 +23,3 @@ pub use schemas::room::*;
 pub use schemas::room_invitation::RoomInvitationPayload;
 pub use schemas::url_link::UrlLinkPayload;
 pub use types::{AsyncFnPtr, IntoAsyncFnPtr};
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
-}

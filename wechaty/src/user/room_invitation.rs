@@ -46,10 +46,10 @@ where
                     self.ctx_.room_invitations().insert(self.id(), payload.clone());
                     self.payload_ = Some(payload.clone());
                     if !payload.inviter_id.is_empty() {
-                        self.ctx_.contact_load(payload.inviter_id.clone()).await;
+                        let _result = self.ctx_.contact_load(payload.inviter_id.clone()).await;
                     }
                     if !payload.receiver_id.is_empty() {
-                        self.ctx_.contact_load(payload.receiver_id.clone()).await;
+                        let _result = self.ctx_.contact_load(payload.receiver_id.clone()).await;
                     }
                     Ok(())
                 }

@@ -61,7 +61,6 @@ where
             Err(WechatyError::NotLoggedIn)
         } else {
             let puppet = self.ctx().puppet();
-            let id = self.id();
             match puppet.contact_self_name_set(name).await {
                 Ok(_) => {
                     match self.sync().await {
@@ -84,7 +83,6 @@ where
             Err(WechatyError::NotLoggedIn)
         } else {
             let puppet = self.ctx().puppet();
-            let id = self.id();
             match puppet.contact_self_signature_set(signature).await {
                 Ok(_) => {
                     match self.sync().await {

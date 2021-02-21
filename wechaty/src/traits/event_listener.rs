@@ -2,28 +2,20 @@ use std::cell::RefCell;
 use std::future::Future;
 use std::rc::Rc;
 
-use actix::{
-    Actor, ActorContext, ActorFuture, AtomicResponse, Context, Handler, Message as ActorMessage, Recipient, WrapFuture,
-};
+use actix::{Actor, ActorFuture, AtomicResponse, Context, Handler, Recipient, WrapFuture};
 use log::{error, info};
 use wechaty_puppet::{
-    AsyncFnPtr, EventDongPayload, EventErrorPayload, EventHeartbeatPayload, EventLoginPayload, EventLogoutPayload,
-    EventMessagePayload, EventReadyPayload, EventResetPayload, EventRoomInvitePayload, EventRoomJoinPayload,
-    EventRoomLeavePayload, EventRoomTopicPayload, EventScanPayload, IntoAsyncFnPtr, PayloadType, Puppet, PuppetEvent,
-    PuppetImpl, Subscribe,
+    AsyncFnPtr, EventDongPayload, EventErrorPayload, EventFriendshipPayload, EventHeartbeatPayload, EventLoginPayload,
+    EventLogoutPayload, EventMessagePayload, EventReadyPayload, EventResetPayload, EventRoomInvitePayload,
+    EventRoomJoinPayload, EventRoomLeavePayload, EventRoomTopicPayload, EventScanPayload, IntoAsyncFnPtr, PayloadType,
+    Puppet, PuppetEvent, PuppetImpl, Subscribe,
 };
 
 use crate::{
-    Contact, ContactSelf, DongPayload, ErrorPayload, HeartbeatPayload, IntoContact, LoginPayload, LogoutPayload,
-    Message, MessagePayload, ReadyPayload, ResetPayload, Room, RoomInvitation, RoomInvitePayload, RoomJoinPayload,
-    RoomLeavePayload, RoomTopicPayload, ScanPayload, WechatyContext,
+    Contact, ContactSelf, DongPayload, ErrorPayload, Friendship, FriendshipPayload, HeartbeatPayload, IntoContact,
+    LoginPayload, LogoutPayload, Message, MessagePayload, ReadyPayload, ResetPayload, Room, RoomInvitation,
+    RoomInvitePayload, RoomJoinPayload, RoomLeavePayload, RoomTopicPayload, ScanPayload, WechatyContext,
 };
-
-#[derive(ActorMessage)]
-#[rtype("()")]
-pub(crate) enum Command {
-    Stop,
-}
 
 pub trait EventListener<T>
 where
@@ -93,6 +85,23 @@ where
     {
         let error_handlers = self.get_listener().error_handlers.clone();
         self.on_event_with_handle(handler.into(), limit, error_handlers, "error")
+            .1
+    }
+
+    fn on_friendship<F>(&mut self, handler: F) -> &mut Self
+    where
+        F: IntoAsyncFnPtr<FriendshipPayload<T>, WechatyContext<T>, ()>,
+    {
+        self.on_friendship_with_handle(handler, None);
+        self
+    }
+
+    fn on_friendship_with_handle<F>(&mut self, handler: F, limit: Option<usize>) -> usize
+    where
+        F: IntoAsyncFnPtr<FriendshipPayload<T>, WechatyContext<T>, ()>,
+    {
+        let friendship_handlers = self.get_listener().friendship_handlers.clone();
+        self.on_event_with_handle(handler.into(), limit, friendship_handlers, "friendship")
             .1
     }
 
@@ -295,6 +304,7 @@ where
     ctx: WechatyContext<T>,
     dong_handlers: HandlersPtr<T, DongPayload>,
     error_handlers: HandlersPtr<T, ErrorPayload>,
+    friendship_handlers: HandlersPtr<T, FriendshipPayload<T>>,
     heartbeat_handlers: HandlersPtr<T, HeartbeatPayload>,
     login_handlers: HandlersPtr<T, LoginPayload<T>>,
     logout_handlers: HandlersPtr<T, LogoutPayload<T>>,
@@ -331,7 +341,6 @@ where
 
     fn handle(&mut self, msg: PuppetEvent, _ctx: &mut Context<Self>) -> Self::Result {
         info!("{} receives puppet event: {:?}", self.name.clone(), msg);
-        let ctx = self.ctx.clone();
         match msg {
             PuppetEvent::Dong(payload) => AtomicResponse::new(Box::pin(
                 async {}
@@ -342,6 +351,11 @@ where
                 async {}
                     .into_actor(self)
                     .then(move |_, this, _| this.trigger_error_handlers(payload).into_actor(this)),
+            )),
+            PuppetEvent::Friendship(payload) => AtomicResponse::new(Box::pin(
+                async {}
+                    .into_actor(self)
+                    .then(move |_, this, _| this.trigger_friendship_handlers(payload).into_actor(this)),
             )),
             PuppetEvent::Heartbeat(payload) => AtomicResponse::new(Box::pin(
                 async {}
@@ -409,19 +423,6 @@ where
     }
 }
 
-impl<T> Handler<Command> for EventListenerInner<T>
-where
-    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
-{
-    type Result = ();
-
-    fn handle(&mut self, msg: Command, ctx: &mut Self::Context) -> Self::Result {
-        match msg {
-            Command::Stop => ctx.stop(),
-        }
-    }
-}
-
 impl<T> EventListenerInner<T>
 where
     T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
@@ -432,6 +433,7 @@ where
             ctx,
             dong_handlers: Rc::new(RefCell::new(vec![])),
             error_handlers: Rc::new(RefCell::new(vec![])),
+            friendship_handlers: Rc::new(RefCell::new(vec![])),
             heartbeat_handlers: Rc::new(RefCell::new(vec![])),
             login_handlers: Rc::new(RefCell::new(vec![])),
             logout_handlers: Rc::new(RefCell::new(vec![])),
@@ -475,6 +477,16 @@ where
         async move { EventListenerInner::<T>::trigger_handlers(ctx, payload, handlers).await }
     }
 
+    fn trigger_friendship_handlers(&mut self, payload: EventFriendshipPayload) -> impl Future<Output = ()> + 'static {
+        let ctx = self.ctx.clone();
+        let mut friendship = Friendship::new(payload.friendship_id, ctx.clone(), None);
+        let handlers = self.friendship_handlers.clone();
+        async move {
+            friendship.ready().await.unwrap_or_default();
+            EventListenerInner::<T>::trigger_handlers(ctx, FriendshipPayload { friendship }, handlers).await
+        }
+    }
+
     fn trigger_heartbeat_handlers(&mut self, payload: EventHeartbeatPayload) -> impl Future<Output = ()> + 'static {
         let ctx = self.ctx.clone();
         let handlers = self.heartbeat_handlers.clone();
@@ -486,7 +498,7 @@ where
         let ctx = self.ctx.clone();
         let handlers = self.login_handlers.clone();
         async move {
-            contact.sync().await;
+            contact.sync().await.unwrap_or_default();
             EventListenerInner::<T>::trigger_handlers(ctx, LoginPayload { contact }, handlers).await
         }
     }
@@ -496,7 +508,7 @@ where
         let ctx = self.ctx.clone();
         let handlers = self.logout_handlers.clone();
         async move {
-            contact.ready(false).await;
+            contact.ready(false).await.unwrap_or_default();
             EventListenerInner::<T>::trigger_handlers(
                 ctx,
                 LogoutPayload {
@@ -514,7 +526,7 @@ where
         let mut message = Message::new(payload.message_id, ctx.clone(), None);
         let handlers = self.message_handlers.clone();
         async move {
-            message.ready().await;
+            message.ready().await.unwrap_or_default();
             EventListenerInner::<T>::trigger_handlers(ctx, MessagePayload { message }, handlers).await
         }
     }
@@ -536,7 +548,7 @@ where
         let ctx = self.ctx.clone();
         let handlers = self.room_invite_handlers.clone();
         async move {
-            room_invitation.ready().await;
+            room_invitation.ready().await.unwrap_or_default();
             EventListenerInner::<T>::trigger_handlers(ctx, RoomInvitePayload { room_invitation }, handlers).await
         }
     }
@@ -547,8 +559,8 @@ where
         let mut room = Room::new(payload.room_id.clone(), ctx.clone(), None);
         let mut inviter = Contact::new(payload.inviter_id.clone(), ctx.clone(), None);
         async move {
-            room.sync().await;
-            inviter.sync().await;
+            room.sync().await.unwrap_or_default();
+            inviter.sync().await.unwrap_or_default();
             let invitee_list = ctx.contact_load_batch(payload.invitee_id_list).await;
             EventListenerInner::<T>::trigger_handlers(
                 ctx,
@@ -570,8 +582,8 @@ where
         let mut room = Room::new(payload.room_id.clone(), ctx.clone(), None);
         let mut remover = Contact::new(payload.remover_id.clone(), ctx.clone(), None);
         async move {
-            room.sync().await;
-            remover.sync().await;
+            room.sync().await.unwrap_or_default();
+            remover.sync().await.unwrap_or_default();
             let removee_list = ctx.contact_load_batch(payload.removee_id_list.clone()).await;
             EventListenerInner::<T>::trigger_handlers(
                 ctx.clone(),
@@ -588,10 +600,12 @@ where
             if payload.removee_id_list.contains(&self_id) {
                 ctx.puppet()
                     .dirty_payload(PayloadType::Room, payload.room_id.clone())
-                    .await;
+                    .await
+                    .unwrap_or_default();
                 ctx.puppet()
                     .dirty_payload(PayloadType::RoomMember, payload.room_id)
-                    .await;
+                    .await
+                    .unwrap_or_default();
             }
         }
     }
@@ -602,8 +616,8 @@ where
         let mut room = Room::new(payload.room_id.clone(), ctx.clone(), None);
         let mut changer = Contact::new(payload.changer_id.clone(), ctx.clone(), None);
         async move {
-            room.sync().await;
-            changer.sync().await;
+            room.sync().await.unwrap_or_default();
+            changer.sync().await.unwrap_or_default();
             EventListenerInner::<T>::trigger_handlers(
                 ctx,
                 RoomTopicPayload {

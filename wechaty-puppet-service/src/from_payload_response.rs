@@ -6,7 +6,7 @@ use wechaty_grpc::puppet::{
     RoomMemberPayloadResponse, RoomPayloadResponse,
 };
 use wechaty_puppet::schemas::contact::ContactPayload;
-use wechaty_puppet::schemas::friendship::{FriendshipPayload, FriendshipType};
+use wechaty_puppet::schemas::friendship::FriendshipPayload;
 use wechaty_puppet::schemas::message::MessagePayload;
 use wechaty_puppet::schemas::room::{RoomMemberPayload, RoomPayload};
 use wechaty_puppet::schemas::room_invitation::RoomInvitationPayload;
@@ -42,32 +42,15 @@ impl FromPayloadResponse<ContactPayloadResponse> for ContactPayload {
 
 impl FromPayloadResponse<FriendshipPayloadResponse> for FriendshipPayload {
     fn from_payload_response(response: FriendshipPayloadResponse) -> Self {
-        match response.r#type {
-            1 => FriendshipPayload::Confirm {
-                id: response.id,
-                contact_id: response.contact_id,
-                hello: response.hello,
-                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                friendship_type: FriendshipType::Confirm,
-            },
-            2 => FriendshipPayload::Receive {
-                id: response.id,
-                contact_id: response.contact_id,
-                hello: response.hello,
-                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                scene: FromPrimitive::from_i32(response.scene).unwrap(),
-                stranger: response.stranger,
-                ticket: response.ticket,
-                friendship_type: FriendshipType::Receive,
-            },
-            3 => FriendshipPayload::Verify {
-                id: response.id,
-                contact_id: response.contact_id,
-                hello: response.hello,
-                timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
-                friendship_type: FriendshipType::Verify,
-            },
-            _ => FriendshipPayload::Unknown,
+        Self {
+            id: response.id,
+            contact_id: response.contact_id,
+            hello: response.hello,
+            timestamp: SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs(),
+            scene: FromPrimitive::from_i32(response.scene).unwrap(),
+            stranger: response.stranger,
+            ticket: response.ticket,
+            friendship_type: FromPrimitive::from_i32(response.r#type).unwrap(),
         }
     }
 }

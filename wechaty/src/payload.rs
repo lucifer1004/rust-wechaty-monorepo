@@ -4,11 +4,19 @@ use wechaty_puppet::{
 };
 
 use crate::user::contact_self::ContactSelf;
-use crate::{Contact, Message, Room, RoomInvitation};
+use crate::{Contact, Friendship, Message, Room, RoomInvitation};
 
 pub type DongPayload = EventDongPayload;
 
 pub type ErrorPayload = EventErrorPayload;
+
+#[derive(Clone, Debug)]
+pub struct FriendshipPayload<T>
+where
+    T: 'static + PuppetImpl + Clone + Unpin + Send + Sync,
+{
+    pub friendship: Friendship<T>,
+}
 
 pub type HeartbeatPayload = EventHeartbeatPayload;
 

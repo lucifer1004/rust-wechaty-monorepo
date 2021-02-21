@@ -1,9 +1,9 @@
 use std::collections::{HashMap, HashSet};
-use std::fmt;
 use std::sync::{Arc, Mutex};
 
 use actix::{Actor, Addr, Context, Handler, Message, Recipient};
 use async_trait::async_trait;
+use filebox::FileBox;
 use futures::StreamExt;
 use log::{debug, error, info};
 use lru::LruCache;
@@ -20,27 +20,6 @@ const DEFAULT_MESSAGE_CACHE_CAP: usize = 500;
 const DEFAULT_ROOM_CACHE_CAP: usize = 500;
 const DEFAULT_ROOM_MEMBER_CACHE_CAP: usize = 30000;
 const DEFAULT_ROOM_INVITATION_CACHE_CAP: usize = 100;
-
-// TODO: FileBox Implementation
-pub struct FileBox {}
-
-impl FileBox {
-    pub fn to_string(&self) -> String {
-        String::new()
-    }
-}
-
-impl fmt::Display for FileBox {
-    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(fmt, "{}", self.to_string())
-    }
-}
-
-impl From<String> for FileBox {
-    fn from(_: String) -> Self {
-        Self {}
-    }
-}
 
 type LruCachePtr<T> = Arc<Mutex<LruCache<String, T>>>;
 
@@ -510,6 +489,7 @@ where
     }
 
     /// Batch load messages with a default batch size of 16.
+    #[allow(dead_code)]
     async fn message_payload_batch(&mut self, message_id_list: Vec<String>) -> Vec<MessagePayload> {
         debug!("message_payload_batch(message_id_list = {:?})", message_id_list);
         let mut message_list = vec![];
@@ -695,6 +675,7 @@ where
     }
 
     /// Batch load friendships with a default batch size of 16.
+    #[allow(dead_code)]
     async fn friendship_payload_batch(&mut self, friendship_id_list: Vec<String>) -> Vec<FriendshipPayload> {
         debug!(
             "friendship_payload_batch(friendship_id_list = {:?})",
@@ -758,6 +739,7 @@ where
     }
 
     /// Batch load room invitations with a default batch size of 16.
+    #[allow(dead_code)]
     async fn room_invitation_payload_batch(
         &mut self,
         room_invitation_id_list: Vec<String>,

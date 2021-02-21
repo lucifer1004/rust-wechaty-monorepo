@@ -4,6 +4,8 @@ use wechaty_puppet::PuppetError;
 
 pub enum WechatyError {
     Puppet(PuppetError),
+    InvalidOperation(String),
+    Maybe(String),
     NotLoggedIn,
     NoPayload,
 }
@@ -18,6 +20,8 @@ impl fmt::Display for WechatyError {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             WechatyError::Puppet(e) => write!(fmt, "Puppet error: {}", e),
+            WechatyError::InvalidOperation(op) => write!(fmt, "Invalid operation: {}", op),
+            WechatyError::Maybe(maybe) => write!(fmt, "An error may have occurred: {}", maybe),
             WechatyError::NotLoggedIn => write!(fmt, "User is not logged in"),
             WechatyError::NoPayload => write!(fmt, "Operation cannot be done because the current entity does not have payload due to an unknown previous issue"),
         }

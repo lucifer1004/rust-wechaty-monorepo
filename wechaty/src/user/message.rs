@@ -68,13 +68,13 @@ where
                     self.ctx_.messages().insert(self.id(), payload.clone());
                     self.payload_ = Some(payload.clone());
                     if !payload.from_id.is_empty() {
-                        self.ctx_.contact_load(payload.from_id.clone()).await;
+                        let _result = self.ctx_.contact_load(payload.from_id.clone()).await;
                     }
                     if !payload.to_id.is_empty() {
-                        self.ctx_.contact_load(payload.to_id.clone()).await;
+                        let _result = self.ctx_.contact_load(payload.to_id.clone()).await;
                     }
                     if !payload.room_id.is_empty() {
-                        self.ctx_.room_load(payload.room_id.clone()).await;
+                        let _result = self.ctx_.room_load(payload.room_id.clone()).await;
                     }
                     Ok(())
                 }

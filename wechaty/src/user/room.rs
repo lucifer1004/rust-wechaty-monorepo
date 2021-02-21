@@ -1,7 +1,7 @@
 use std::fmt;
 
 use log::{debug, error};
-use wechaty_puppet::{PayloadType, PuppetImpl, RoomPayload};
+use wechaty_puppet::{PayloadType, PuppetImpl, RoomMemberQueryFilter, RoomPayload};
 
 use crate::{Contact, Entity, WechatyContext, WechatyError};
 
@@ -62,6 +62,27 @@ where
     pub(crate) async fn sync(&mut self) -> Result<(), WechatyError> {
         debug!("Room.sync(id = {})", self.id_);
         self.ready(true).await
+    }
+
+    pub async fn member_find(&self, query: RoomMemberQueryFilter) -> Result<Vec<Contact<T>>, WechatyError> {
+        debug!("Room.member_find(id = {}, query = {:?})", self.id_, query);
+        let ctx = self.ctx();
+        match ctx.puppet().room_member_search(self.id(), query).await {
+            Ok(member_id_list) => Ok(ctx.contact_load_batch(member_id_list).await),
+            Err(e) => Err(WechatyError::from(e)),
+        }
+    }
+
+    pub async fn member_find_by_string(&self, query_str: String) -> Result<Vec<Contact<T>>, WechatyError> {
+        debug!(
+            "Room.member_find_by_string(id = {}, query_str = {:?})",
+            self.id_, query_str
+        );
+        let ctx = self.ctx();
+        match ctx.puppet().room_member_search_by_string(self.id(), query_str).await {
+            Ok(member_id_list) => Ok(ctx.contact_load_batch(member_id_list).await),
+            Err(e) => Err(WechatyError::from(e)),
+        }
     }
 
     pub async fn member_find_all(&self) -> Result<Vec<Contact<T>>, WechatyError> {

@@ -1,10 +1,7 @@
 #![feature(async_closure)]
 use std::env;
 
-use wechaty::{
-    wechaty_rt, EventListener, IntoContact, LoginPayload, LogoutPayload, MessagePayload, MessageType, PuppetOptions,
-    ScanPayload, Wechaty, WechatyContext,
-};
+use wechaty::prelude::*;
 use wechaty_puppet_service::PuppetService;
 
 #[wechaty_rt::main]
@@ -65,12 +62,12 @@ async fn main() {
                     let text = message.text().unwrap_or_default();
                     if text == "bye" {
                         println!("Good bye!");
-                        ctx.logout().await;
+                        ctx.logout().await.unwrap_or_default();
                         return;
                     }
                     if text == "ding" {
                         if let Err(e) = message.reply_text("dong".to_owned()).await {
-                            println!("Failed to send message");
+                            println!("Failed to send message, reason: {}", e);
                         } else {
                             println!("REPLY: dong");
                         }

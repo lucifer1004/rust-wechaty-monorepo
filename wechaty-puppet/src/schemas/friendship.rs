@@ -26,34 +26,16 @@ pub enum FriendshipSceneType {
     QRCode = 30,
 }
 
-// TODO: In Rust, a struct is not allowed to have a fixed value as its field.
 #[derive(Debug, Clone)]
-pub enum FriendshipPayload {
-    Unknown,
-    Confirm {
-        id: String,
-        contact_id: String,
-        hello: String,
-        timestamp: u64,
-        friendship_type: FriendshipType,
-    },
-    Receive {
-        id: String,
-        contact_id: String,
-        hello: String,
-        timestamp: u64,
-        scene: FriendshipSceneType,
-        stranger: String,
-        ticket: String,
-        friendship_type: FriendshipType,
-    },
-    Verify {
-        id: String,
-        contact_id: String,
-        hello: String,
-        timestamp: u64,
-        friendship_type: FriendshipType,
-    },
+pub struct FriendshipPayload {
+    pub id: String,
+    pub contact_id: String,
+    pub hello: String,
+    pub timestamp: u64,
+    pub scene: FriendshipSceneType,
+    pub stranger: String,
+    pub ticket: String,
+    pub friendship_type: FriendshipType,
 }
 
 #[derive(Debug, Clone)]
